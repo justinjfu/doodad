@@ -196,7 +196,7 @@ class EC2SpotDocker(DockerMode):
             image_id=None,
             aws_key_name=None,
             iam_instance_profile_name='poodag',
-            s3_exp_prefix='experiment',
+            s3_log_prefix='experiment',
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
@@ -208,7 +208,7 @@ class EC2SpotDocker(DockerMode):
         self.s3_bucket = s3_bucket
         self.image_id = image_id
         self.aws_key_name = aws_key_name
-        self.s3_exp_prefix = 'experiment'
+        self.s3_log_prefix = s3_log_prefix
         self.iam_instance_profile_name = iam_instance_profile_name
 
         self.s3_mount_path = 's3://%s/poodag/mount' % self.s3_bucket
@@ -230,8 +230,8 @@ class EC2SpotDocker(DockerMode):
         if check_exist:
             if s3_exists(bucket, remote_path):
                 print('%s exists! ' % os.path.join(bucket, remote_path))
-                return
-        s3_upload(file_name, bucket, remote_path, dry=dry)
+                return 's3://'+os.path.join(bucket, remote_path)
+        return s3_upload(file_name, bucket, remote_path, dry=dry)
 
     def make_timekey(self):
         return '_%d'%(int(time.time()*1000))
@@ -251,7 +251,7 @@ class EC2SpotDocker(DockerMode):
         )
         aws_config = dict(default_config)
         exp_name = 'run'+self.make_timekey()
-        exp_prefix = self.s3_exp_prefix
+        exp_prefix = self.s3_log_prefix
         remote_log_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
         log_dir = "/tmp/expt/local/" + exp_prefix.replace("_", "-") + "/" + exp_name
 
@@ -285,17 +285,17 @@ class EC2SpotDocker(DockerMode):
                 if mount.read_only:
                     with mount.gzip() as gzip_file:
                         gzip_path = os.path.realpath(gzip_file)
-                        file_hash = hash_file(gzip_path)+'.tar'
-                        s3_path = self.s3_upload(gzip_path, self.s3_bucket, remote_filename=file_hash)
-                        remote_tar_name = '/tmp/'+file_hash 
-                        remote_unpack_name = '/tmp/'+os.path.splitext(file_hash)[0]
+                        file_hash = hash_file(gzip_path)
+                        s3_path = self.s3_upload(gzip_path, self.s3_bucket, remote_filename=file_hash+'.tar')
+                        remote_tar_name = '/tmp/'+file_hash+'.tar'
+                        remote_unpack_name = '/tmp/'+file_hash
                     sio.write("aws s3 cp {s3_path} {remote_tar_name}\n".format(s3_path=s3_path, remote_tar_name=remote_tar_name))
                     sio.write("mkdir -p {local_code_path}\n".format(local_code_path=remote_unpack_name))
                     sio.write("tar -xvf {remote_tar_name} -C {local_code_path}\n".format(
-                        local_code_path='/tmp/', 
+                        local_code_path=remote_unpack_name, 
                         remote_tar_name=remote_tar_name))
                     mount_point =  os.path.join('/mounts', mount.mount_point.replace('~/',''))
-                    mnt_args += ' -v %s:%s' % (remote_unpack_name, mount_point)
+                    mnt_args += ' -v %s:%s' % (os.path.join(remote_unpack_name, os.path.basename(mount.local_dir)), mount_point) 
                     if mount.pythonpath:
                         py_path.append(mount_point)
                 else:

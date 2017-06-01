@@ -63,7 +63,7 @@ class MountLocal(Mount):
             # make a tar.gzip archive of directory
             with tarfile.open(fileobj=tf, mode="w") as tar:
                 #tar.add(self.local_dir, arcname=os.path.splitext(os.path.basename(tf.name))[0], filter=filter_func)
-                tar.add(self.local_dir, arcname=self.local_dir, filter=filter_func)
+                tar.add(self.local_dir, arcname=os.path.basename(self.local_dir), filter=filter_func)
             yield tf.name
 
     def __str__(self):
