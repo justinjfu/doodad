@@ -79,8 +79,12 @@ class MountGitRepo(Mount):
 
 
 class MountS3(Mount):
-    def __init__(self, s3_bucket, s3_path, sync_interval=15, output=False, **kwargs):
+    def __init__(self, s3_path, s3_bucket=None, sync_interval=15, output=False, **kwargs):
         super(MountS3, self).__init__(**kwargs)
+        if s3_bucket is None:
+            # load from config
+            from poodag.ec2.autoconfig import AUTOCONFIG
+            s3_bucket = AUTOCONFIG.s3_bucket()
         self.s3_bucket = s3_bucket
         self.s3_path = s3_path
         self.output = output

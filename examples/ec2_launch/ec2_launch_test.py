@@ -21,15 +21,11 @@ mode_ssh = pd.mode.SSHDocker(
 )
 
 # or use this! 
-mode_ec2 = pd.mode.EC2SpotDocker(
+mode_ec2 = pd.mode.EC2AutoconfigDocker(
     image='python:3.5',
     region='us-west-1',
     instance_type='m3.medium',
     spot_price=0.02,
-    s3_bucket='my.s3.bucket',
-    image_id='ami-efb5ff8f',  # replace image id here
-    aws_key_name='rllab-us-west-1',  #  replace aws key here
-    credentials=ec2.AWSCredentials(from_config=True) # should be already set up by rllab
 )
 
 
@@ -39,15 +35,15 @@ mounts = [
     mount.MountLocal(local_dir='~/code/poodag', pythonpath=True), # Code
     mount.MountLocal(local_dir='~/code/poodag/examples/secretlib', pythonpath=True), # Code
     # output directories
-    mount.MountLocal(local_dir='~/code/poodag/examples/tmp_output', mount_point=OUTPUT_DIR, read_only=False), #Output directory - set read_only=False
-    #mount.MountS3(s3_bucket='my.s3.bucket', s3_path='outputs', mount_point=OUTPUT_DIR, output=True)  # use this for ec2
+    #mount.MountLocal(local_dir='~/code/poodag/examples/tmp_output', mount_point=OUTPUT_DIR, read_only=False), #Output directory - set read_only=False
+    mount.MountS3(s3_path='outputs', mount_point=OUTPUT_DIR, output=True)  # use this for ec2
 ]
 
 
 THIS_FILE_DIR = os.path.realpath(os.path.dirname(__file__))
 pd.launch_python(
     target=os.path.join(THIS_FILE_DIR, 'app_main.py'),  # point to a target script. If running remotely, this will be copied over
-    mode=mode_ssh,
+    mode=mode_ec2,
     mount_points=mounts,
     args={
         'arg1': 50,

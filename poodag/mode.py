@@ -195,7 +195,7 @@ class EC2SpotDocker(DockerMode):
             terminate=True,
             image_id=None,
             aws_key_name=None,
-            iam_instance_profile_name='rllab',
+            iam_instance_profile_name='poodag',
             s3_exp_prefix='experiment',
             **kwargs
             ):
@@ -421,19 +421,24 @@ class EC2SpotDocker(DockerMode):
 
 class EC2AutoconfigDocker(EC2SpotDocker):
     def __init__(self, 
+            region='us-west-1',
             **kwargs
             ):
         # find config file
-        raise NotImplementedError()
-        s3_bucket = 'aaa'
-        image_id = 'aaa'
-        aws_key_name='aaa'
-        credentials=None
+        from poodag.ec2.autoconfig import AUTOCONFIG
+        from poodag.ec2.credentials import AWSCredentials
+        s3_bucket = AUTOCONFIG.s3_bucket()
+        image_id = AUTOCONFIG.aws_image_id(region)
+        aws_key_name= AUTOCONFIG.aws_key_name(region)
+        iam_profile= AUTOCONFIG.iam_profile_name()
+        credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
         super(EC2AutoconfigDocker, self).__init__(
-                s3_bucket=s3_bucker,
+                s3_bucket=s3_bucket,
                 image_id=image_id,
                 aws_key_name=aws_key_name,
+                iam_instance_profile_name=iam_profile,
                 credentials=credentials,
+                region=region,
                 **kwargs 
                 )
 
