@@ -4,6 +4,7 @@ import poodag as pd
 import poodag.ec2 as ec2
 import poodag.ssh as ssh
 import poodag.mount as mount
+from poodag.utils import EXAMPLES_DIR, REPO_DIR
 
 
 # Local run
@@ -28,22 +29,27 @@ mode_ec2 = pd.mode.EC2AutoconfigDocker(
     spot_price=0.02,
 )
 
+MY_RUN_MODE = mode_ec2  # CHANGE THIS
 
 # Set up code and output directories
 OUTPUT_DIR = '/example/outputs'  # this is the directory visible to the target 
 mounts = [
-    mount.MountLocal(local_dir='~/code/poodag', pythonpath=True), # Code
-    mount.MountLocal(local_dir='~/code/poodag/examples/secretlib', pythonpath=True), # Code
-    # output directories
-    #mount.MountLocal(local_dir='~/code/poodag/examples/tmp_output', mount_point=OUTPUT_DIR, read_only=False), #Output directory - set read_only=False
-    mount.MountS3(s3_path='outputs', mount_point=OUTPUT_DIR, output=True)  # use this for ec2
+    mount.MountLocal(local_dir=REPO_DIR, pythonpath=True), # Code
+    mount.MountLocal(local_dir=os.path.join(EXAMPLES_DIR, 'secretlib', pythonpath=True), # Code
 ]
+
+if MY_RUN_MODE == mode_ec2:
+    output_mount = mount.MountS3(s3_path='outputs', mount_point=OUTPUT_DIR, output=True)  # use this for ec2
+else:
+    output_mount = mount.MountLocal(local_dir=os.path.join(EXAMPLES_DIR, 'tmp_output'), 
+        mount_point=OUTPUT_DIR, read_only=False), #Output directory - set read_only=False
+mounts.append(output_mount)
 
 
 THIS_FILE_DIR = os.path.realpath(os.path.dirname(__file__))
 pd.launch_python(
     target=os.path.join(THIS_FILE_DIR, 'app_main.py'),  # point to a target script. If running remotely, this will be copied over
-    mode=mode_ec2,
+    mode=MY_RUN_MODE,
     mount_points=mounts,
     args={
         'arg1': 50,
