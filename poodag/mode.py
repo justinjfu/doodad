@@ -10,6 +10,8 @@ except ImportError:
     from io import StringIO
 
 from .mount import *
+from .utils import hash_file
+from .ec2.aws_util import s3_upload, s3_exists
 
 class LaunchMode(object):
     def launch_command(self, cmd, mount_points=None, dry=False):
@@ -193,6 +195,7 @@ class EC2SpotDocker(DockerMode):
             terminate=True,
             image_id=None,
             aws_key_name=None,
+            iam_instance_profile_name='rllab',
             s3_exp_prefix='experiment',
             **kwargs
             ):
@@ -206,6 +209,7 @@ class EC2SpotDocker(DockerMode):
         self.image_id = image_id
         self.aws_key_name = aws_key_name
         self.s3_exp_prefix = 'experiment'
+        self.iam_instance_profile_name = iam_instance_profile_name
 
         self.s3_mount_path = 's3://%s/poodag/mount' % self.s3_bucket
         self.aws_s3_path = 's3://%s/poodag/logs' % self.s3_bucket
@@ -219,14 +223,15 @@ class EC2SpotDocker(DockerMode):
         os.unlink(f.name)
         return remote_path
 
-    def s3_upload(self, file_name, dry=False):
-        base = self.s3_mount_path
-        remote_path = "%s/%s" % (base, os.path.basename(file_name))
-        upload_cmd = ["aws", "s3", "cp", file_name, remote_path]
-        print(" ".join(upload_cmd))
-        if not dry:
-            subprocess.check_call(upload_cmd)
-        return remote_path
+    def s3_upload(self, file_name, bucket, remote_filename=None, dry=False, check_exist=True):
+        if remote_filename is None:
+            remote_filename = os.path.basename(file_name)
+        remote_path = 'poodag/mount/'+remote_filename
+        if check_exist:
+            if s3_exists(bucket, remote_path):
+                print('%s exists! ' % os.path.join(bucket, remote_path))
+                return
+        s3_upload(file_name, bucket, remote_path, dry=dry)
 
     def make_timekey(self):
         return '_%d'%(int(time.time()*1000))
@@ -239,7 +244,7 @@ class EC2SpotDocker(DockerMode):
             instance_type=self.instance_type,
             key_name=self.aws_key_name,
             spot_price=self.spot_price,
-            iam_instance_profile_name='rllab', #config.AWS_IAM_INSTANCE_PROFILE_NAME,
+            iam_instance_profile_name=self.iam_instance_profile_name,
             security_groups=[], #config.AWS_SECURITY_GROUPS,
             security_group_ids=[], #config.AWS_SECURITY_GROUP_IDS,
             network_interfaces=[], #config.AWS_NETWORK_INTERFACES,
@@ -274,12 +279,16 @@ class EC2SpotDocker(DockerMode):
         py_path = []
         output_mounts = []
         for mount in mount_points:
+            if verbose:
+                print('Handling mount: ', mount)
             if isinstance(mount, MountLocal):  # TODO: these should be mount_s3 objects
                 if mount.read_only:
                     with mount.gzip() as gzip_file:
-                        s3_path = self.s3_upload(os.path.realpath(gzip_file))
-                        remote_tar_name = '/tmp/'+os.path.basename(gzip_file)
-                        remote_unpack_name = '/tmp/'+os.path.splitext(os.path.basename(gzip_file))[0]
+                        gzip_path = os.path.realpath(gzip_file)
+                        file_hash = hash_file(gzip_path)+'.tar'
+                        s3_path = self.s3_upload(gzip_path, self.s3_bucket, remote_filename=file_hash)
+                        remote_tar_name = '/tmp/'+file_hash 
+                        remote_unpack_name = '/tmp/'+os.path.splitext(file_hash)[0]
                     sio.write("aws s3 cp {s3_path} {remote_tar_name}\n".format(s3_path=s3_path, remote_tar_name=remote_tar_name))
                     sio.write("mkdir -p {local_code_path}\n".format(local_code_path=remote_unpack_name))
                     sio.write("tar -xvf {remote_tar_name} -C {local_code_path}\n".format(
@@ -408,6 +417,25 @@ class EC2SpotDocker(DockerMode):
                     break
                 except botocore.exceptions.ClientError:
                     continue
+
+
+class EC2AutoconfigDocker(EC2SpotDocker):
+    def __init__(self, 
+            **kwargs
+            ):
+        # find config file
+        raise NotImplementedError()
+        s3_bucket = 'aaa'
+        image_id = 'aaa'
+        aws_key_name='aaa'
+        credentials=None
+        super(EC2AutoconfigDocker, self).__init__(
+                s3_bucket=s3_bucker,
+                image_id=image_id,
+                aws_key_name=aws_key_name,
+                credentials=credentials,
+                **kwargs 
+                )
 
 
 class CodalabDocker(DockerMode):

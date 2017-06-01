@@ -49,7 +49,7 @@ class MountLocal(Mount):
         os.makedirs(self.local_dir, exist_ok=True)
 
     @contextmanager
-    def gzip(self, filter_ext=('.pyc','.log')):
+    def gzip(self, filter_ext=('.pyc','.log', '.git')):
         """
         Return filepath to a gzipped version of this directory for uploading
         """
@@ -62,8 +62,12 @@ class MountLocal(Mount):
         with tempfile.NamedTemporaryFile('wb', suffix='.tar') as tf:
             # make a tar.gzip archive of directory
             with tarfile.open(fileobj=tf, mode="w") as tar:
-                tar.add(self.local_dir, arcname=os.path.splitext(os.path.basename(tf.name))[0], filter=filter_func)
+                #tar.add(self.local_dir, arcname=os.path.splitext(os.path.basename(tf.name))[0], filter=filter_func)
+                tar.add(self.local_dir, arcname=self.local_dir, filter=filter_func)
             yield tf.name
+
+    def __str__(self):
+        return 'MountLocal@%s'%self.local_dir
 
 
 class MountGitRepo(Mount):
@@ -83,3 +87,5 @@ class MountS3(Mount):
         self.sync_interval = sync_interval
         self.sync_on_terminate = True
 
+    def __str__(self):
+        return 'MountS3@s3://%s/%s'% (self.s3_bucket, self.s3_path)
