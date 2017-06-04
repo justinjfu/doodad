@@ -10,29 +10,13 @@ except ImportError:
     from io import StringIO
 
 from .mount import *
-from .utils import hash_file
+from .utils import hash_file, call_and_wait
 from .ec2.aws_util import s3_upload, s3_exists
 
 class LaunchMode(object):
     def launch_command(self, cmd, mount_points=None, dry=False):
         raise NotImplementedError()
 
-
-def call_and_wait(cmd, verbose=False, dry=False):
-    if dry or verbose:
-        print(cmd)
-    if not dry:
-        p = subprocess.Popen(cmd, shell=True)
-    try:
-        p.wait()
-    except KeyboardInterrupt:
-        try:
-            print("terminating")
-            p.terminate()
-        except OSError:
-            print("os error!")
-            pass
-        p.wait()
 
 
 class Local(LaunchMode):
@@ -86,8 +70,10 @@ class DockerMode(LaunchMode):
     def __init__(self, image='ubuntu:16.04'):
         super(DockerMode, self).__init__()
         self.docker_image = image
+        self.docker_name = uuid.uuid4()
 
-    def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None):
+    def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
+            checkpoint=False):
         cmd_list= []
         if pre_cmd:
             cmd_list.extend(pre_cmd)
@@ -98,18 +84,29 @@ class DockerMode(LaunchMode):
         cmd_list.append(main_cmd)
         if post_cmd:
             cmd_list.extend(post_cmd)
+
+        docker_name = self.docker_name
+        if docker_name:
+            extra_args += ' -name %s '%docker_name
+
+        if checkpoint:
+            # set up checkpoint stuff
+            use_tty = False
+            extra_args += ' -d '  # detach is optional
+
         if use_tty:
             docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
         else:
-            docker_prefix = 'docker run %s -t %s /bin/bash -c ' % (extra_args, self.docker_image)
+            docker_prefix = 'docker run %s %s /bin/bash -c ' % (extra_args, self.docker_image)
         main_cmd = ';'.join(cmd_list)
         full_cmd = docker_prefix + ("\'%s\'" % main_cmd)
         return full_cmd
 
 
 class LocalDocker(DockerMode):
-    def __init__(self, **kwargs):
+    def __init__(self, checkpoints=None, **kwargs):
         super(LocalDocker, self).__init__(**kwargs)
+        self.checkpoints = checkpoints
 
     def launch_command(self, cmd, mount_points=None, dry=False):
         mnt_args = ''
@@ -121,7 +118,9 @@ class LocalDocker(DockerMode):
                     py_path.append(mount.mount_point)
             else:
                 raise NotImplementedError()
-        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path)
+
+        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path, 
+                checkpoint=self.checkpoints)
         call_and_wait(full_cmd, dry=dry)
 
 
@@ -165,7 +164,11 @@ class SSHDocker(DockerMode):
             else:
                 raise NotImplementedError()
 
-        docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
+        if self.checkpoint and self.checkpoint.restore:
+            raise NotImplementedError()
+        else:
+            docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
+
 
         remote_cmds.append(docker_cmd)
         remote_cmds.extend(remote_cleanup_commands)
@@ -309,7 +312,7 @@ class EC2SpotDocker(DockerMode):
                 # Sync interval
                 sio.write("""
                 while /bin/true; do
-                    aws s3 sync --exclude '*' --include '*.txt' --include '*.log' --include '*.csv' --include '*.json' {log_dir} {s3_path}
+                    aws s3 sync --exclude '*' --include '*.txt' --include '*.log' --include '*.csv' --include '*.json' --include '*.tar' --include '*.gz' {log_dir} {s3_path}
                     sleep {periodic_sync_interval}
                 done & echo sync initiated""".format( log_dir=remote_dir, s3_path=s3_path,
                                                      periodic_sync_interval=mount.sync_interval))
@@ -334,7 +337,10 @@ class EC2SpotDocker(DockerMode):
         sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}\n".format(
             exp_name=exp_name, aws_region=self.region))
         sio.write("mkdir -p {log_dir}\n".format(log_dir=log_dir))
-        docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
+        if self.checkpoint and self.checkpoint.restore:
+            raise NotImplementedError()
+        else:
+            docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
         sio.write(docker_cmd+'\n')
 
         sio.write("aws s3 cp --recursive {log_dir} {remote_log_dir}\n".format(log_dir=log_dir, remote_log_dir=remote_log_dir))

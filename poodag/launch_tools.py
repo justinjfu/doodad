@@ -46,3 +46,4 @@ def make_python_command(target, python_cmd='python', args=None):
     if args:
         cmd += ' --%s "%s"' % (ARGS_DATA, args_encoded)
     return cmd
+

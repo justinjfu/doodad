@@ -17,3 +17,23 @@ def hash_file(filename):
             hasher.update(data)
     return hasher.hexdigest()
 
+
+def call_and_wait(cmd, verbose=False, dry=False):
+    if dry or verbose:
+        print(cmd)
+    if not dry:
+        p = subprocess.Popen(cmd, shell=True)
+    try:
+        p.wait()
+    except KeyboardInterrupt:
+        try:
+            print("terminating")
+            p.terminate()
+        except OSError:
+            print("os error!")
+            pass
+        p.wait()
+
+
+class ShellCommandWriter(object):
+    pass
