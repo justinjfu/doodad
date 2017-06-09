@@ -1,5 +1,6 @@
 import hashlib
 import os
+import subprocess
 
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.dirname(THIS_FILE_DIR)

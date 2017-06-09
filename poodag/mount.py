@@ -49,7 +49,7 @@ class MountLocal(Mount):
         os.makedirs(self.local_dir, exist_ok=True)
 
     @contextmanager
-    def gzip(self, filter_ext=('.pyc','.log', '.git')):
+    def gzip(self, filter_ext=('.pyc','.log', '.git', 'data')):
         """
         Return filepath to a gzipped version of this directory for uploading
         """
@@ -59,7 +59,7 @@ class MountLocal(Mount):
             if filt:
                 return None
             return tar_info
-        with tempfile.NamedTemporaryFile('wb', suffix='.tar') as tf:
+        with tempfile.NamedTemporaryFile('wb+', suffix='.tar') as tf:
             # make a tar.gzip archive of directory
             with tarfile.open(fileobj=tf, mode="w") as tar:
                 #tar.add(self.local_dir, arcname=os.path.splitext(os.path.basename(tf.name))[0], filter=filter_func)

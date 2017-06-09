@@ -87,7 +87,7 @@ class DockerMode(LaunchMode):
 
         docker_name = self.docker_name
         if docker_name:
-            extra_args += ' -name %s '%docker_name
+            extra_args += ' --name %s '%docker_name
 
         if checkpoint:
             # set up checkpoint stuff
@@ -108,19 +108,22 @@ class LocalDocker(DockerMode):
         super(LocalDocker, self).__init__(**kwargs)
         self.checkpoints = checkpoints
 
-    def launch_command(self, cmd, mount_points=None, dry=False):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=True):
         mnt_args = ''
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
-                mnt_args += ' -v %s:%s' % (mount.local_dir, mount.mount_point)
+                mount_pnt = os.path.expanduser(mount.mount_point)
+                mnt_args += ' -v %s:%s' % (mount.local_dir, mount_pnt)
                 if mount.pythonpath:
-                    py_path.append(mount.mount_point)
+                    py_path.append(mount_pnt)
             else:
                 raise NotImplementedError()
 
         full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path, 
                 checkpoint=self.checkpoints)
+        if verbose:
+            print(full_cmd)
         call_and_wait(full_cmd, dry=dry)
 
 
@@ -130,6 +133,9 @@ class SSHDocker(DockerMode):
     def __init__(self, credentials=None, **docker_args):
         super(SSHDocker, self).__init__(**docker_args)
         self.credentials = credentials
+        self.run_id = 'run_%s' % uuid.uuid4()
+        self.tmp_dir = os.path.join(SSHDocker.TMP_DIR, self.run_id)
+        self.checkpoint = None
 
     def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=True):
         py_path = []
@@ -137,7 +143,7 @@ class SSHDocker(DockerMode):
         remote_cleanup_commands = []
         mnt_args = ''
 
-        tmp_dir_cmd = 'mkdir -p %s' % SSHDocker.TMP_DIR
+        tmp_dir_cmd = 'mkdir -p %s' % self.tmp_dir
         tmp_dir_cmd = self.credentials.get_ssh_bash_cmd(tmp_dir_cmd)
         call_and_wait(tmp_dir_cmd, dry=dry, verbose=verbose)
 
@@ -148,13 +154,16 @@ class SSHDocker(DockerMode):
                 if mount.read_only:
                     with mount.gzip() as gzip_file:
                         # scp
-                        remote_name = os.path.join(SSHDocker.TMP_DIR, os.path.basename(gzip_file))
-                        scp_cmd = self.credentials.get_scp_cmd(gzip_file, remote_name)
+                        base_name = os.path.basename(gzip_file)
+                        remote_mnt_dir = os.path.join(self.tmp_dir, os.path.splitext(base_name)[0])
+                        remote_tar = os.path.join(self.tmp_dir, base_name)
+                        scp_cmd = self.credentials.get_scp_cmd(gzip_file, remote_tar)
                         call_and_wait(scp_cmd, dry=dry, verbose=verbose)
-                    unzip_cmd = 'tar -xf %s -C %s' % (remote_name, SSHDocker.TMP_DIR)
+                    remote_cmds.append('mkdir -p %s' % remote_mnt_dir)
+                    unzip_cmd = 'tar -xf %s -C %s' % (remote_tar, remote_mnt_dir)
                     remote_cmds.append(unzip_cmd)
                     mount_point =  os.path.join('/mounts', mount.mount_point.replace('~/',''))
-                    mnt_args += ' -v %s:%s' % (os.path.splitext(remote_name)[0],mount_point)
+                    mnt_args += ' -v %s:%s' % (os.path.join(remote_mnt_dir, os.path.basename(mount.mount_point)) ,mount_point)
                 else:
                     #remote_cmds.append('mkdir -p %s' % mount.mount_point)
                     mnt_args += ' -v %s:%s' % (mount.local_dir_raw, mount.mount_point)
