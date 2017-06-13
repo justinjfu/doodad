@@ -20,13 +20,20 @@ def __get_arg_config():
     return args
 
 
-def get_args():
+def get_args(key=None, default=None):
     args = __get_arg_config()
-    if args.use_cloudpickle:
-        import cloudpickle
-        data = cloudpickle.loads(base64.b64decode(args.args_data))
+
+    if args.args_data:
+        if args.use_cloudpickle:
+            import cloudpickle
+            data = cloudpickle.loads(base64.b64decode(args.args_data))
+        else:
+            data = pickle.loads(base64.b64decode(args.args_data))
     else:
-        data = pickle.loads(base64.b64decode(args.args_data))
+        data = {}
+
+    if key is not None:
+        return data.get(key, default)
     return data
 
 def encode_args(call_args, cloudpickle=False):

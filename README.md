@@ -14,7 +14,6 @@ export PYTHONPATH=$PYTHONPATH:/path/to/this/repo
 - Install dependencies
 ```
 pip install -r requirements.txt
-
 ```
 
 - (Optional) Set up EC2
