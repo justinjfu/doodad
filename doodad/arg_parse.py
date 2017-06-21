@@ -1,12 +1,15 @@
 import pickle
 import base64
 import argparse
+import os
 
-ARGS_DATA = 'args_data'
+ARGS_DATA = 'DOODAD_ARGS_DATA'
+USE_CLOUDPICKLE = 'DOODAD_USE_CLOUDPICLE'
 
 
 __ARGS = None
 def __get_arg_config():
+    """
     global __ARGS
     if __ARGS is not None:
         return __ARGS
@@ -17,6 +20,13 @@ def __get_arg_config():
     parser.add_argument('--output_dir', type=str, default='/tmp/expt/')
     args = parser.parse_args()
     __ARGS = args
+    """
+    args_data = os.environ.get(ARGS_DATA, {})
+    use_cloudpickle = os.environ.get(USE_CLOUDPICKLE, False)
+
+    args = lambda : None # hack - use function as namespace
+    args.args_data = args_data
+    args.use_cloudpickle = use_cloudpickle
     return args
 
 

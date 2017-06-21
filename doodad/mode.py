@@ -36,6 +36,7 @@ class Local(LaunchMode):
         py_path = []
         cleanup_commands = CommandBuilder()
         for mount in mount_points:
+            print('mounting:', mount)
             if isinstance(mount, MountLocal):
                 if not mount.no_remount:
                     mount.create_if_nonexistent()

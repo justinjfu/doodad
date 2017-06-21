@@ -50,6 +50,6 @@ def make_python_command(target, python_cmd='python', args=None, fake_display=Fal
 
     args_encoded = encode_args(args)
     if args:
-        cmd += ' --%s "%s"' % (ARGS_DATA, args_encoded)
+        cmd = '%s=%s %s' % (ARGS_DATA, args_encoded, cmd)
     return cmd
 
