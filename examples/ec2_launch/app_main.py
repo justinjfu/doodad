@@ -1,13 +1,13 @@
 import os
 
-import poodag as pd
+import doodad as dd
 
 import secretlib
 
 print('Launching app_main!')
 
 # These are arguments passed in from launch_python
-args_dict = pd.get_args()
+args_dict = dd.get_args()
 print('My args are:', args_dict)
 
 # Test proper mounting

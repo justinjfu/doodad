@@ -1,7 +1,7 @@
 import configparser
 import os
 
-from poodag.utils import REPO_DIR
+from doodad.utils import REPO_DIR
 
 class Autoconfig(object):
     def __init__(self, filename=None):

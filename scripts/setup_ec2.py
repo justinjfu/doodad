@@ -25,14 +25,14 @@ if ACCESS_KEY is None:
 ACCESS_SECRET = os.environ.get("AWS_ACCESS_SECRET", None)
 if ACCESS_SECRET is None:
     raise ValueError('Please set the $AWS_ACCESS_KEY environment variable')
-S3_BUCKET_NAME = os.environ.get("POODAG_S3_BUCKET", None)
+S3_BUCKET_NAME = os.environ.get("$DOODAD_S3_BUCKET", None)
 if S3_BUCKET_NAME is None:
-    raise ValueError('Please set the $POODAG_S3_BUCKET environment variable')
+    raise ValueError('Please set the $DOODAD_S3_BUCKET environment variable')
 PREFIX = os.environ.get("RLLAB_PREFIX", "")
 
-SECURITY_GROUP_NAME = PREFIX + "poodag-sg"
-INSTANCE_PROFILE_NAME = PREFIX + "poodag"
-INSTANCE_ROLE_NAME = PREFIX + "poodag"
+SECURITY_GROUP_NAME = PREFIX + "doodad-sg"
+INSTANCE_PROFILE_NAME = PREFIX + "doodad"
+INSTANCE_ROLE_NAME = PREFIX + "doodad"
 
 ALL_REGION_AWS_SECURITY_GROUP_IDS = {}
 ALL_REGION_AWS_KEY_NAMES = {}
@@ -101,7 +101,7 @@ def setup_iam():
         existing_role.load()
         # if role exists, delete and recreate
         response = query_yes_no(
-            "There is an existing role named %s. Proceed to delete everything poodag-related and recreate?" %
+            "There is an existing role named %s. Proceed to delete everything and recreate?" %
             INSTANCE_ROLE_NAME,
             default="no", allow_skip=True)
         if response == "skip":
@@ -238,7 +238,7 @@ def setup_ec2():
         print("Creating security group in VPC %s" % str(vpc.id))
         try:
             security_group = vpc.create_security_group(
-                GroupName=SECURITY_GROUP_NAME, Description='Security group for poodag'
+                GroupName=SECURITY_GROUP_NAME, Description='Security group for doodad'
             )
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'InvalidGroup.Duplicate':
@@ -259,7 +259,7 @@ def setup_ec2():
                 raise e
         print("Security group created with id %s" % str(security_group.id))
 
-        key_name = PREFIX + ('poodag-%s' % region)
+        key_name = PREFIX + ('doodad-%s' % region)
         try:
             print("Trying to create key pair with name %s" % key_name)
             key_pair = ec2_client.create_key_pair(KeyName=key_name)

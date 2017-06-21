@@ -2,12 +2,12 @@ import os
 import time
 import subprocess
 
-import poodag as pd
+import doodad as dd
 
 print('Launching app_main!')
 
 # These are arguments passed in from launch_python
-args_dict = pd.get_args()
+args_dict = dd.get_args()
 print('My args are:', args_dict)
 
 k = 0

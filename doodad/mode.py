@@ -10,7 +10,7 @@ except ImportError:
     from io import StringIO
 
 from .mount import *
-from .utils import hash_file, call_and_wait
+from .utils import hash_file, call_and_wait, CommandBuilder
 from .ec2.aws_util import s3_upload, s3_exists
 
 class LaunchMode(object):
@@ -28,18 +28,18 @@ class Local(LaunchMode):
         if dry: 
             print(cmd); return
 
-        cmd_list = []
+        commands = CommandBuilder()
         # chdir to home dir
-        cmd_list.append('cd %s' % (os.path.expanduser('~')))
+        commands.append('cd %s' % (os.path.expanduser('~')))
 
         # do mounting
         py_path = []
-        cleanup_commands = []
+        cleanup_commands = CommandBuilder()
         for mount in mount_points:
             if isinstance(mount, MountLocal):
                 if not mount.no_remount:
                     mount.create_if_nonexistent()
-                    cmd_list.append('ln -s %s %s' % (mount.local_dir, mount.mount_point))
+                    commands.append('ln -s %s %s' % (mount.local_dir, mount.mount_point))
                     #subprocess.call(symlink_cmd, shell=True)
                     if mount.cleanup:
                         cleanup_commands.append('rm "%s"' % mount.mount_point)
@@ -50,18 +50,16 @@ class Local(LaunchMode):
 
         # add pythonpath mounts
         if py_path:
-            cmd_list.append('export PYTHONPATH=$PYTHONPATH:%s' % (':'.join(py_path)))
+            commands.append('export PYTHONPATH=$PYTHONPATH:%s' % (':'.join(py_path)))
 
         # Add main command
-        cmd_list.append(cmd)
+        commands.append(cmd)
 
         # cleanup
-        for clean_cmd in cleanup_commands:
-            cmd_list.append(clean_cmd)
+        commands.extend(cleanup_commands)
 
         # Call everything
-        #print('DEBUG: commands:', cmd_list)
-        subprocess.call(';'.join(cmd_list), shell=True, env=dict(os.environ, **self.env))
+        commands.call_and_wait()
 
 LOCAL = Local()
 
@@ -73,10 +71,12 @@ class DockerMode(LaunchMode):
         self.docker_name = uuid.uuid4()
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
-            checkpoint=False):
-        cmd_list= []
+            checkpoint=False, no_root=True):
+        cmd_list= CommandBuilder()
         if pre_cmd:
             cmd_list.extend(pre_cmd)
+
+
         if verbose:
             cmd_list.append('echo \"Running in docker\"')
         if pythonpath:
@@ -93,12 +93,16 @@ class DockerMode(LaunchMode):
             # set up checkpoint stuff
             use_tty = False
             extra_args += ' -d '  # detach is optional
+        #if no_root:
+        #    extra_args += ' -u $(id -u)'
+
+
 
         if use_tty:
             docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
         else:
             docker_prefix = 'docker run %s %s /bin/bash -c ' % (extra_args, self.docker_image)
-        main_cmd = ';'.join(cmd_list)
+        main_cmd = cmd_list.to_string()
         full_cmd = docker_prefix + ("\'%s\'" % main_cmd)
         return full_cmd
 
@@ -128,7 +132,7 @@ class LocalDocker(DockerMode):
 
 
 class SSHDocker(DockerMode):
-    TMP_DIR = '~/.poodag_tmp'
+    TMP_DIR = '~/.remote_tmp'
 
     def __init__(self, credentials=None, **docker_args):
         super(SSHDocker, self).__init__(**docker_args)
@@ -139,8 +143,8 @@ class SSHDocker(DockerMode):
 
     def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=True):
         py_path = []
-        remote_cmds = []
-        remote_cleanup_commands = []
+        remote_cmds = CommandBuilder()
+        remote_cleanup_commands = CommandBuilder()
         mnt_args = ''
 
         tmp_dir_cmd = 'mkdir -p %s' % self.tmp_dir
@@ -148,13 +152,13 @@ class SSHDocker(DockerMode):
         call_and_wait(tmp_dir_cmd, dry=dry, verbose=verbose)
 
         # SCP Code over
-        # TODO: add feature for no scp if hashes match
         for mount in mount_points:
             if isinstance(mount, MountLocal):
                 if mount.read_only:
                     with mount.gzip() as gzip_file:
                         # scp
                         base_name = os.path.basename(gzip_file)
+                        #file_hash = hash_file(gzip_path)  # TODO: store all code in a special "caches" folder
                         remote_mnt_dir = os.path.join(self.tmp_dir, os.path.splitext(base_name)[0])
                         remote_tar = os.path.join(self.tmp_dir, base_name)
                         scp_cmd = self.credentials.get_scp_cmd(gzip_file, remote_tar)
@@ -207,7 +211,7 @@ class EC2SpotDocker(DockerMode):
             terminate=True,
             image_id=None,
             aws_key_name=None,
-            iam_instance_profile_name='poodag',
+            iam_instance_profile_name='doodad',
             s3_log_prefix='experiment',
             **kwargs
             ):
@@ -223,8 +227,8 @@ class EC2SpotDocker(DockerMode):
         self.s3_log_prefix = s3_log_prefix
         self.iam_instance_profile_name = iam_instance_profile_name
 
-        self.s3_mount_path = 's3://%s/poodag/mount' % self.s3_bucket
-        self.aws_s3_path = 's3://%s/poodag/logs' % self.s3_bucket
+        self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
+        self.aws_s3_path = 's3://%s/doodad/logs' % self.s3_bucket
 
     def upload_file_to_s3(script_content):
         f = tempfile.NamedTemporaryFile(delete=False)
@@ -238,7 +242,7 @@ class EC2SpotDocker(DockerMode):
     def s3_upload(self, file_name, bucket, remote_filename=None, dry=False, check_exist=True):
         if remote_filename is None:
             remote_filename = os.path.basename(file_name)
-        remote_path = 'poodag/mount/'+remote_filename
+        remote_path = 'doodad/mount/'+remote_filename
         if check_exist:
             if s3_exists(bucket, remote_path):
                 print('%s exists! ' % os.path.join(bucket, remote_path))
@@ -440,8 +444,8 @@ class EC2AutoconfigDocker(EC2SpotDocker):
             **kwargs
             ):
         # find config file
-        from poodag.ec2.autoconfig import AUTOCONFIG
-        from poodag.ec2.credentials import AWSCredentials
+        from doodad.ec2.autoconfig import AUTOCONFIG
+        from doodad.ec2.credentials import AWSCredentials
         s3_bucket = AUTOCONFIG.s3_bucket()
         image_id = AUTOCONFIG.aws_image_id(region)
         aws_key_name= AUTOCONFIG.aws_key_name(region)

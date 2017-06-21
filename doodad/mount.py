@@ -49,13 +49,13 @@ class MountLocal(Mount):
         os.makedirs(self.local_dir, exist_ok=True)
 
     @contextmanager
-    def gzip(self, filter_ext=('.pyc','.log', '.git', 'data')):
+    def gzip(self, filter_ext=('.pyc','.log', '.git', '.mp4'), filter_dir=('data',)):
         """
         Return filepath to a gzipped version of this directory for uploading
         """
         assert self.read_only
         def filter_func(tar_info):
-            filt = any([tar_info.name.endswith(ext) for ext in filter_ext])
+            filt = any([tar_info.name.endswith(ext) for ext in filter_ext]) or any([ tar_info.name.endswith('/'+ext) for ext in filter_dir])
             if filt:
                 return None
             return tar_info
@@ -83,7 +83,7 @@ class MountS3(Mount):
         super(MountS3, self).__init__(**kwargs)
         if s3_bucket is None:
             # load from config
-            from poodag.ec2.autoconfig import AUTOCONFIG
+            from doodad.ec2.autoconfig import AUTOCONFIG
             s3_bucket = AUTOCONFIG.s3_bucket()
         self.s3_bucket = s3_bucket
         self.s3_path = s3_path
