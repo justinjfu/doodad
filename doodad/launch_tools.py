@@ -25,8 +25,8 @@ def launch_python(
     env=None,
     dry=False,
     fake_display=False,
+    target_mount_dir=None,
     ):
-    target_full_path = os.path.realpath(target)
     if args is None:
         args = {}
     if mount_points is None:
@@ -34,7 +34,11 @@ def launch_python(
 
     # mount
     target_dir = os.path.dirname(target)
-    mount_points.append(MountLocal(local_dir=target_dir, mount_point=target_dir))
+    if not target_mount_dir:
+        target_mount_dir = target_dir
+    target_mount = MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
+    mount_points.append(target_mount)
+    target_full_path = os.path.join(target_mount.docker_mount_dir(), os.path.basename(os.path.dirname(target)), os.path.basename(target))
 
     command = make_python_command(target_full_path, args=args, python_cmd=python_cmd, fake_display=fake_display)
     mode.launch_command(command, mount_points=mount_points, dry=dry)

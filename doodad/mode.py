@@ -167,7 +167,7 @@ class SSHDocker(DockerMode):
                     remote_cmds.append('mkdir -p %s' % remote_mnt_dir)
                     unzip_cmd = 'tar -xf %s -C %s' % (remote_tar, remote_mnt_dir)
                     remote_cmds.append(unzip_cmd)
-                    mount_point =  os.path.join('/mounts', mount.mount_point.replace('~/',''))
+                    mount_point = mount.docker_mount_dir()
                     mnt_args += ' -v %s:%s' % (os.path.join(remote_mnt_dir, os.path.basename(mount.mount_point)) ,mount_point)
                 else:
                     #remote_cmds.append('mkdir -p %s' % mount.mount_point)

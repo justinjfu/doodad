@@ -33,11 +33,16 @@ class Mount(object):
 
 
 class MountLocal(Mount):
-    def __init__(self, local_dir, mount_point=None, cleanup=True, **kwargs):
+    def __init__(self, local_dir, mount_point=None, cleanup=True, 
+                filter_ext=('.pyc', '.log', '.git', '.mp4'),
+                filter_dir=('data',),
+                **kwargs):
         super(MountLocal, self).__init__(mount_point=mount_point, **kwargs)
         self.local_dir = os.path.realpath(os.path.expanduser(local_dir))
         self.local_dir_raw = local_dir
         self.cleanup = cleanup
+        self.filter_ext = filter_ext
+        self.filter_dir = filter_dir
         if mount_point is None:
             self.set_mount(local_dir)
             self.no_remount = True
@@ -49,13 +54,13 @@ class MountLocal(Mount):
         os.makedirs(self.local_dir, exist_ok=True)
 
     @contextmanager
-    def gzip(self, filter_ext=('.pyc','.log', '.git', '.mp4'), filter_dir=('data',)):
+    def gzip(self):
         """
         Return filepath to a gzipped version of this directory for uploading
         """
         assert self.read_only
         def filter_func(tar_info):
-            filt = any([tar_info.name.endswith(ext) for ext in filter_ext]) or any([ tar_info.name.endswith('/'+ext) for ext in filter_dir])
+            filt = any([tar_info.name.endswith(ext) for ext in self.filter_ext]) or any([ tar_info.name.endswith('/'+ext) for ext in self.filter_dir])
             if filt:
                 return None
             return tar_info
@@ -68,6 +73,9 @@ class MountLocal(Mount):
 
     def __str__(self):
         return 'MountLocal@%s'%self.local_dir
+
+    def docker_mount_dir(self):
+         return os.path.join('/mounts', self.mount_point.replace('~/',''))
 
 
 class MountGitRepo(Mount):
