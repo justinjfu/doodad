@@ -38,11 +38,10 @@ def launch_python(
         target_mount_dir = target_dir
     target_mount = MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
     mount_points.append(target_mount)
-    target_full_path = os.path.join(target_mount.docker_mount_dir(), os.path.basename(os.path.dirname(target)), os.path.basename(target))
+    target_full_path = os.path.join(target_mount.docker_mount_dir(), os.path.basename(target))
 
     command = make_python_command(target_full_path, args=args, python_cmd=python_cmd, fake_display=fake_display)
     mode.launch_command(command, mount_points=mount_points, dry=dry)
-
 
 HEADLESS = 'xvfb-run -a -s "-ac -screen 0 1400x900x24 +extension RANDR"'
 def make_python_command(target, python_cmd='python', args=None, fake_display=False):

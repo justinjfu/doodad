@@ -40,7 +40,7 @@ if MY_RUN_MODE == mode_ec2:
     output_mount = mount.MountS3(s3_path='outputs', mount_point=OUTPUT_DIR, output=True)  # use this for ec2
 else:
     output_mount = mount.MountLocal(local_dir=os.path.join(EXAMPLES_DIR, 'tmp_output'), 
-        mount_point=OUTPUT_DIR, read_only=False) #Output directory - set read_only=False
+        mount_point=OUTPUT_DIR, output=True)
 mounts.append(output_mount)
 
 print(mounts)

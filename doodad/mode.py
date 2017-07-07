@@ -77,7 +77,6 @@ class DockerMode(LaunchMode):
         if pre_cmd:
             cmd_list.extend(pre_cmd)
 
-
         if verbose:
             cmd_list.append('echo \"Running in docker\"')
         if pythonpath:
@@ -94,10 +93,8 @@ class DockerMode(LaunchMode):
             # set up checkpoint stuff
             use_tty = False
             extra_args += ' -d '  # detach is optional
-        #if no_root:
-        #    extra_args += ' -u $(id -u)'
-
-
+        if no_root:
+            extra_args += ' -u $(id -u)'
 
         if use_tty:
             docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
@@ -120,6 +117,7 @@ class LocalDocker(DockerMode):
             if isinstance(mount, MountLocal):
                 mount_pnt = os.path.expanduser(mount.mount_point)
                 mnt_args += ' -v %s:%s' % (mount.local_dir, mount_pnt)
+                call_and_wait('mkdir -p %s' % mount.local_dir)
                 if mount.pythonpath:
                     py_path.append(mount_pnt)
             else:
@@ -171,6 +169,7 @@ class SSHDocker(DockerMode):
                     mnt_args += ' -v %s:%s' % (os.path.join(remote_mnt_dir, os.path.basename(mount.mount_point)) ,mount_point)
                 else:
                     #remote_cmds.append('mkdir -p %s' % mount.mount_point)
+                    remote_cmds.append('mkdir -p %s' % mount.local_dir_raw)
                     mnt_args += ' -v %s:%s' % (mount.local_dir_raw, mount.mount_point)
 
                 if mount.pythonpath:
