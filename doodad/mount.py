@@ -69,6 +69,7 @@ class MountLocal(Mount):
             with tarfile.open(fileobj=tf, mode="w") as tar:
                 #tar.add(self.local_dir, arcname=os.path.splitext(os.path.basename(tf.name))[0], filter=filter_func)
                 tar.add(self.local_dir, arcname=os.path.basename(self.local_dir), filter=filter_func)
+            tf.seek(0)
             yield tf.name
 
     def __str__(self):

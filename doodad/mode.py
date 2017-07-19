@@ -72,7 +72,7 @@ class DockerMode(LaunchMode):
         self.docker_name = uuid.uuid4()
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
-            checkpoint=False, no_root=True):
+            checkpoint=False, no_root=False):
         cmd_list= CommandBuilder()
         if pre_cmd:
             cmd_list.extend(pre_cmd)
@@ -81,6 +81,14 @@ class DockerMode(LaunchMode):
             cmd_list.append('echo \"Running in docker\"')
         if pythonpath:
             cmd_list.append('export PYTHONPATH=$PYTHONPATH:%s' % (':'.join(pythonpath)))
+        if no_root:
+            # This should work if you're running a script
+            #cmd_list.append('useradd --uid $(id -u) --no-create-home --home-dir / doodaduser')
+            #cmd_list.append('su - doodaduser /bin/bash {script}')
+
+            # this is a temp workaround
+            extra_args += ' -u $(id -u)'
+
         cmd_list.append(main_cmd)
         if post_cmd:
             cmd_list.extend(post_cmd)
@@ -93,8 +101,6 @@ class DockerMode(LaunchMode):
             # set up checkpoint stuff
             use_tty = False
             extra_args += ' -d '  # detach is optional
-        if no_root:
-            extra_args += ' -u $(id -u)'
 
         if use_tty:
             docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
@@ -115,7 +121,8 @@ class LocalDocker(DockerMode):
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
-                mount_pnt = os.path.expanduser(mount.mount_point)
+                #mount_pnt = os.path.expanduser(mount.mount_point)
+                mount_pnt = mount.docker_mount_dir()
                 mnt_args += ' -v %s:%s' % (mount.local_dir, mount_pnt)
                 call_and_wait('mkdir -p %s' % mount.local_dir)
                 if mount.pythonpath:
