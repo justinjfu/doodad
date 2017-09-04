@@ -233,6 +233,7 @@ class EC2SpotDocker(DockerMode):
         self.aws_key_name = aws_key_name
         self.s3_log_prefix = s3_log_prefix
         self.iam_instance_profile_name = iam_instance_profile_name
+        self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
         self.aws_s3_path = 's3://%s/doodad/logs' % self.s3_bucket
