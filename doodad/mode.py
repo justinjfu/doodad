@@ -14,7 +14,7 @@ from .utils import hash_file, call_and_wait, CommandBuilder
 from .ec2.aws_util import s3_upload, s3_exists
 
 class LaunchMode(object):
-    def launch_command(self, cmd, mount_points=None, dry=False):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         raise NotImplementedError()
 
 
@@ -24,7 +24,7 @@ class Local(LaunchMode):
         super(Local, self).__init__()
         self.env = {}
 
-    def launch_command(self, cmd, mount_points=None, dry=False):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         if dry: 
             print(cmd); return
 
@@ -116,7 +116,7 @@ class LocalDocker(DockerMode):
         super(LocalDocker, self).__init__(**kwargs)
         self.checkpoints = checkpoints
 
-    def launch_command(self, cmd, mount_points=None, dry=False, verbose=True):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         mnt_args = ''
         py_path = []
         for mount in mount_points:
@@ -147,7 +147,7 @@ class SSHDocker(DockerMode):
         self.tmp_dir = os.path.join(SSHDocker.TMP_DIR, self.run_id)
         self.checkpoint = None
 
-    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=True):
+    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
         py_path = []
         remote_cmds = CommandBuilder()
         remote_cleanup_commands = CommandBuilder()
@@ -253,14 +253,14 @@ class EC2SpotDocker(DockerMode):
         remote_path = 'doodad/mount/'+remote_filename
         if check_exist:
             if s3_exists(bucket, remote_path):
-                print('%s exists! ' % os.path.join(bucket, remote_path))
+                print('\t%s exists! ' % os.path.join(bucket, remote_path))
                 return 's3://'+os.path.join(bucket, remote_path)
         return s3_upload(file_name, bucket, remote_path, dry=dry)
 
     def make_timekey(self):
         return '_%d'%(int(time.time()*1000))
 
-    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=True):
+    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
         #dry=True #DRY
 
         default_config = dict(
@@ -303,8 +303,7 @@ class EC2SpotDocker(DockerMode):
         py_path = []
         output_mounts = []
         for mount in mount_points:
-            if verbose:
-                print('Handling mount: ', mount)
+            print('Handling mount: ', mount)
             if isinstance(mount, MountLocal):  # TODO: these should be mount_s3 objects
                 if mount.read_only:
                     with mount.gzip() as gzip_file:
@@ -333,9 +332,9 @@ class EC2SpotDocker(DockerMode):
                 # Sync interval
                 sio.write("""
                 while /bin/true; do
-                    aws s3 sync --exclude '*' --include '*.txt' --include '*.log' --include '*.csv' --include '*.json' --include '*.tar' --include '*.gz' {log_dir} {s3_path}
+                    aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
                     sleep {periodic_sync_interval}
-                done & echo sync initiated""".format( log_dir=remote_dir, s3_path=s3_path,
+                done & echo sync initiated""".format(include_string=mount.include_string, log_dir=remote_dir, s3_path=s3_path,
                                                      periodic_sync_interval=mount.sync_interval))
                 # Sync on terminate
                 sio.write("""
@@ -396,7 +395,8 @@ class EC2SpotDocker(DockerMode):
         else:
             user_data = full_script
 
-        print(full_script)
+        if verbose:
+            print(full_script)
         #with open("/tmp/full_script", "w") as f:
         #    f.write(full_script)
 
@@ -415,9 +415,10 @@ class EC2SpotDocker(DockerMode):
             #**config.AWS_EXTRA_CONFIGS,
         )
 
-        print("************************************************************")
-        print('UserData:', instance_args["UserData"])
-        print("************************************************************")
+        if verbose:
+            print("************************************************************")
+            print('UserData:', instance_args["UserData"])
+            print("************************************************************")
         instance_args["UserData"] = base64.b64encode(instance_args["UserData"].encode()).decode("utf-8")
         spot_args = dict(
             DryRun=dry,
@@ -426,11 +427,15 @@ class EC2SpotDocker(DockerMode):
             SpotPrice=aws_config["spot_price"],
             # ClientToken=params_list[0]["exp_name"],
         )
+
         import pprint
-        pprint.pprint(spot_args)
+        if verbose:
+            pprint.pprint(spot_args)
         if not dry:
             response = ec2.request_spot_instances(**spot_args)
-            print(response)
+            print('Launched EC2 job - Server response:')
+            pprint.pprint(response)
+            print('*****'*5)
             spot_request_id = response['SpotInstanceRequests'][
                 0]['SpotInstanceRequestId']
             for _ in range(10):

@@ -88,7 +88,8 @@ class MountGitRepo(Mount):
 
 
 class MountS3(Mount):
-    def __init__(self, s3_path, s3_bucket=None, sync_interval=15, output=False, **kwargs):
+    def __init__(self, s3_path, s3_bucket=None, sync_interval=15, output=False, 
+            include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), **kwargs):
         super(MountS3, self).__init__(**kwargs)
         if s3_bucket is None:
             # load from config
@@ -99,6 +100,11 @@ class MountS3(Mount):
         self.output = output
         self.sync_interval = sync_interval
         self.sync_on_terminate = True
+        self.include_types = include_types
 
     def __str__(self):
         return 'MountS3@s3://%s/%s'% (self.s3_bucket, self.s3_path)
+
+    @property
+    def include_string(self):
+        return ' '.join(['--include \'%s\''%type_ for type_ in self.include_types])
