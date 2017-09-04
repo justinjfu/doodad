@@ -238,7 +238,7 @@ class EC2SpotDocker(DockerMode):
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
         self.aws_s3_path = 's3://%s/doodad/logs' % self.s3_bucket
 
-    def upload_file_to_s3(script_content):
+    def upload_file_to_s3(self, script_content, dry=False):
         f = tempfile.NamedTemporaryFile(delete=False)
         f.write(script_content.encode())
         f.close()
