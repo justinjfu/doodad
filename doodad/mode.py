@@ -375,6 +375,7 @@ class EC2SpotDocker(DockerMode):
 
         full_script = dedent(sio.getvalue())
         import boto3
+        import botocore
         ec2 = boto3.client(
             "ec2",
             region_name=self.region,
@@ -429,6 +430,7 @@ class EC2SpotDocker(DockerMode):
         )
 
         import pprint
+
         if verbose:
             pprint.pprint(spot_args)
         if not dry:
