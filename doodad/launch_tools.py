@@ -1,6 +1,6 @@
 import os
 
-from .mode import LOCAL
+from .mode import LOCAL, Local
 from .arg_parse import encode_args, ARGS_DATA
 from .mount import MountLocal
 
@@ -38,7 +38,10 @@ def launch_python(
     if not target_mount_dir:
         target_mount_dir = target_dir
     target_mount_dir = os.path.join(target_mount_dir, os.path.basename(target_dir))
-    target_mount = MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
+    if isinstance(mode, Local):
+        target_mount = MountLocal(local_dir=target_dir)
+    else:
+        target_mount = MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
     mount_points = mount_points + [target_mount]
     target_full_path = os.path.join(target_mount.docker_mount_dir(), os.path.basename(target))
 
