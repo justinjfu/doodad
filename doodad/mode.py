@@ -25,7 +25,7 @@ class Local(LaunchMode):
         self.env = {}
 
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
-        if dry: 
+        if dry:
             print(cmd); return
 
         commands = CommandBuilder()
@@ -130,7 +130,7 @@ class LocalDocker(DockerMode):
             else:
                 raise NotImplementedError()
 
-        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path, 
+        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path,
                 checkpoint=self.checkpoints)
         if verbose:
             print(full_cmd)
@@ -196,7 +196,7 @@ class SSHDocker(DockerMode):
         with tempfile.NamedTemporaryFile('w+', suffix='.sh') as ntf:
             for cmd in remote_cmds:
                 if verbose:
-                    ntf.write('echo "%s$ %s"\n' % (self.credentials.user_host, cmd)) 
+                    ntf.write('echo "%s$ %s"\n' % (self.credentials.user_host, cmd))
                 ntf.write(cmd+'\n')
             ntf.seek(0)
             ssh_cmd = self.credentials.get_ssh_script_cmd(ntf.name)
@@ -209,7 +209,7 @@ def dedent(s):
     return '\n'.join(lines)
 
 class EC2SpotDocker(DockerMode):
-    def __init__(self, 
+    def __init__(self,
             credentials,
             region='us-west-1',
             instance_type='m1.small',
@@ -274,7 +274,7 @@ class EC2SpotDocker(DockerMode):
             network_interfaces=[], #config.AWS_NETWORK_INTERFACES,
         )
         aws_config = dict(default_config)
-        exp_name = 'run'+self.make_timekey()
+        exp_name = "{}_{}".format(self.s3_log_prefix, self.make_timekey())
         exp_prefix = self.s3_log_prefix
         remote_log_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
         log_dir = "/tmp/expt/local/" + exp_prefix.replace("_", "-") + "/" + exp_name
@@ -315,10 +315,10 @@ class EC2SpotDocker(DockerMode):
                     sio.write("aws s3 cp {s3_path} {remote_tar_name}\n".format(s3_path=s3_path, remote_tar_name=remote_tar_name))
                     sio.write("mkdir -p {local_code_path}\n".format(local_code_path=remote_unpack_name))
                     sio.write("tar -xvf {remote_tar_name} -C {local_code_path}\n".format(
-                        local_code_path=remote_unpack_name, 
+                        local_code_path=remote_unpack_name,
                         remote_tar_name=remote_tar_name))
                     mount_point =  os.path.join('/mounts', mount.mount_point.replace('~/',''))
-                    mnt_args += ' -v %s:%s' % (os.path.join(remote_unpack_name, os.path.basename(mount.local_dir)), mount_point) 
+                    mnt_args += ' -v %s:%s' % (os.path.join(remote_unpack_name, os.path.basename(mount.local_dir)), mount_point)
                     if mount.pythonpath:
                         py_path.append(mount_point)
                 else:
@@ -454,7 +454,7 @@ class EC2SpotDocker(DockerMode):
 
 
 class EC2AutoconfigDocker(EC2SpotDocker):
-    def __init__(self, 
+    def __init__(self,
             region='us-west-1',
             **kwargs
             ):
@@ -473,7 +473,7 @@ class EC2AutoconfigDocker(EC2SpotDocker):
                 iam_instance_profile_name=iam_profile,
                 credentials=credentials,
                 region=region,
-                **kwargs 
+                **kwargs
                 )
 
 
