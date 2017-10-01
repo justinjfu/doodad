@@ -220,6 +220,7 @@ class EC2SpotDocker(DockerMode):
             aws_key_name=None,
             iam_instance_profile_name='doodad',
             s3_log_prefix='experiment',
+            output_dir_visible_to_ec2_instance='/tmp/expt/',
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
@@ -234,6 +235,10 @@ class EC2SpotDocker(DockerMode):
         self.s3_log_prefix = s3_log_prefix
         self.iam_instance_profile_name = iam_instance_profile_name
         self.checkpoint = None
+        # TODO(vitchyr): Figure out if I want to use this
+        self.output_dir_visible_to_ec2_instance = (
+            output_dir_visible_to_ec2_instance
+        )
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
         self.aws_s3_path = 's3://%s/doodad/logs' % self.s3_bucket
@@ -274,10 +279,13 @@ class EC2SpotDocker(DockerMode):
             network_interfaces=[], #config.AWS_NETWORK_INTERFACES,
         )
         aws_config = dict(default_config)
-        exp_name = "{}_{}".format(self.s3_log_prefix, self.make_timekey())
+        exp_name = "{}-{}".format(self.s3_log_prefix, self.make_timekey())
+        # exp_name = 'run'+self.make_timekey()
         exp_prefix = self.s3_log_prefix
-        remote_log_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
-        log_dir = "/tmp/expt/local/" + exp_prefix.replace("_", "-") + "/" + exp_name
+        s3_dir_path = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
+        # log_dir = "/tmp/expt/local/" + exp_prefix.replace("_", "-") + "/" + exp_name
+        # log_dir = "/tmp/expt/" + exp_prefix.replace("_", "-") + "/" + exp_name
+        log_dir = "/tmp/expt/"
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
@@ -302,6 +310,7 @@ class EC2SpotDocker(DockerMode):
         mnt_args = ''
         py_path = []
         output_mounts = []
+        max_sync_interval = 0
         for mount in mount_points:
             print('Handling mount: ', mount)
             if isinstance(mount, MountLocal):  # TODO: these should be mount_s3 objects
@@ -324,18 +333,24 @@ class EC2SpotDocker(DockerMode):
                 else:
                     raise ValueError()
             elif isinstance(mount, MountS3):
-                remote_dir = mount.mount_point
-                s3_path = os.path.join(remote_log_dir, mount.s3_path)
-                sio.write("mkdir -p {remote_dir}\n".format(remote_dir=remote_dir))
-                mnt_args += ' -v %s:%s' % (remote_dir, mount.mount_point)
+                # Make them the same just for convenience
+                ec2_local_dir = mount.mount_point
+                s3_path = os.path.join(s3_dir_path, mount.s3_path)
+                sio.write("mkdir -p {remote_dir}\n".format(
+                    remote_dir=ec2_local_dir)
+                )
+                mnt_args += ' -v %s:%s' % (ec2_local_dir, mount.mount_point)
 
                 # Sync interval
                 sio.write("""
                 while /bin/true; do
                     aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
                     sleep {periodic_sync_interval}
-                done & echo sync initiated""".format(include_string=mount.include_string, log_dir=remote_dir, s3_path=s3_path,
-                                                     periodic_sync_interval=mount.sync_interval))
+                done & echo sync
+                initiated""".format(include_string=mount.include_string,
+                    log_dir=ec2_local_dir, s3_path=s3_path,
+                    periodic_sync_interval=mount.sync_interval))
+                max_sync_interval = max(max_sync_interval, mount.sync_interval)
                 # Sync on terminate
                 sio.write("""
                     while /bin/true; do
@@ -349,7 +364,7 @@ class EC2SpotDocker(DockerMode):
                             sleep 5
                         fi
                     done & echo log sync initiated
-                """.format(log_dir=remote_dir, s3_path=s3_path))
+                """.format(log_dir=ec2_local_dir, s3_path=s3_path))
             else:
                 raise NotImplementedError()
 
@@ -363,8 +378,9 @@ class EC2SpotDocker(DockerMode):
             docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
         sio.write(docker_cmd+'\n')
 
-        sio.write("aws s3 cp --recursive {log_dir} {remote_log_dir}\n".format(log_dir=log_dir, remote_log_dir=remote_log_dir))
-        sio.write("aws s3 cp /home/ubuntu/user_data.log {remote_log_dir}/stdout.log\n".format(remote_log_dir=remote_log_dir))
+        sio.write("aws s3 cp --recursive {log_dir} {s3_dir_path}\n".format(log_dir=log_dir, s3_dir_path=s3_dir_path))
+        sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_dir_path))
+        # TODO(vitchyr): sleep to wait for terminal sync
 
         if self.terminate:
             sio.write("""
@@ -398,8 +414,9 @@ class EC2SpotDocker(DockerMode):
 
         if verbose:
             print(full_script)
-        #with open("/tmp/full_script", "w") as f:
-        #    f.write(full_script)
+        # print(full_script)
+        with open("/tmp/full_script", "w") as f:
+            f.write(full_script)
 
         instance_args = dict(
             ImageId=aws_config["image_id"],
