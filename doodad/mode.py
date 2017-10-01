@@ -309,7 +309,7 @@ class EC2SpotDocker(DockerMode):
 
         mnt_args = ''
         py_path = []
-        output_mounts = []
+        local_output_dir_and_s3_path = []
         max_sync_interval = 0
         for mount in mount_points:
             print('Handling mount: ', mount)
@@ -336,6 +336,10 @@ class EC2SpotDocker(DockerMode):
                 # Make them the same just for convenience
                 ec2_local_dir = mount.mount_point
                 s3_path = os.path.join(s3_dir_path, mount.s3_path)
+                if mount.output:
+                    local_output_dir_and_s3_path.append(
+                        (ec2_local_dir, s3_path)
+                    )
                 sio.write("mkdir -p {remote_dir}\n".format(
                     remote_dir=ec2_local_dir)
                 )
@@ -378,9 +382,16 @@ class EC2SpotDocker(DockerMode):
             docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
         sio.write(docker_cmd+'\n')
 
-        sio.write("aws s3 cp --recursive {log_dir} {s3_dir_path}\n".format(log_dir=log_dir, s3_dir_path=s3_dir_path))
+        # sio.write("aws s3 cp --recursive {log_dir} {s3_dir_path}\n".format(log_dir=log_dir, s3_dir_path=s3_dir_path))
+        for (local_output_dir, s3_dir_path) in local_output_dir_and_s3_path:
+            sio.write("aws s3 cp --recursive {log_dir} {s3_dir_path}\n".format(
+                log_dir=local_output_dir,
+                s3_dir_path=s3_dir_path
+            ))
         sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_dir_path))
-        # TODO(vitchyr): sleep to wait for terminal sync
+        # Wait for last sync/terminal
+        if max_sync_interval > 0:
+            sio.write("sleep {}".format(max_sync_interval))
 
         if self.terminate:
             sio.write("""
