@@ -285,7 +285,7 @@ class EC2SpotDocker(DockerMode):
         s3_dir_path = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
         # log_dir = "/tmp/expt/local/" + exp_prefix.replace("_", "-") + "/" + exp_name
         # log_dir = "/tmp/expt/" + exp_prefix.replace("_", "-") + "/" + exp_name
-        log_dir = "/tmp/expt/"
+        # log_dir = "/tmp/expt/"
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
@@ -333,7 +333,8 @@ class EC2SpotDocker(DockerMode):
                 else:
                     raise ValueError()
             elif isinstance(mount, MountS3):
-                # Make them the same just for convenience
+                # In theory the ec2_local_dir could be some random directory,
+                # but we make them the same just for convenience
                 ec2_local_dir = mount.mount_point
                 s3_path = os.path.join(s3_dir_path, mount.s3_path)
                 if mount.output:
@@ -356,26 +357,26 @@ class EC2SpotDocker(DockerMode):
                     periodic_sync_interval=mount.sync_interval))
                 max_sync_interval = max(max_sync_interval, mount.sync_interval)
                 # Sync on terminate
-                sio.write("""
-                    while /bin/true; do
-                        if [ -z $(curl -Is http://169.254.169.254/latest/meta-data/spot/termination-time | head -1 | grep 404 | cut -d \  -f 2) ]
-                          then
-                            logger "Running shutdown hook."
-                            aws s3 cp --recursive {log_dir} {s3_path}
-                            break
-                          else
-                            # Spot instance not yet marked for termination.
-                            sleep 5
-                        fi
-                    done & echo log sync initiated
-                """.format(log_dir=ec2_local_dir, s3_path=s3_path))
+                # sio.write("""
+                    # while /bin/true; do
+                        # if [ -z $(curl -Is http://169.254.169.254/latest/meta-data/spot/termination-time | head -1 | grep 404 | cut -d \  -f 2) ]
+                          # then
+                            # logger "Running shutdown hook."
+                            # aws s3 cp --recursive {log_dir} {s3_path}
+                            # break
+                          # else
+                            # # Spot instance not yet marked for termination.
+                            # sleep 5
+                        # fi
+                    # done & echo log sync initiated
+                # """.format(log_dir=ec2_local_dir, s3_path=s3_path))
             else:
                 raise NotImplementedError()
 
 
         sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}\n".format(
             exp_name=exp_name, aws_region=self.region))
-        sio.write("mkdir -p {log_dir}\n".format(log_dir=log_dir))
+        # sio.write("mkdir -p {log_dir}\n".format(log_dir=log_dir))
         if self.checkpoint and self.checkpoint.restore:
             raise NotImplementedError()
         else:
@@ -383,6 +384,7 @@ class EC2SpotDocker(DockerMode):
         sio.write(docker_cmd+'\n')
 
         # sio.write("aws s3 cp --recursive {log_dir} {s3_dir_path}\n".format(log_dir=log_dir, s3_dir_path=s3_dir_path))
+        # Sync all output mounts to s3 after runing the docker script
         for (local_output_dir, s3_dir_path) in local_output_dir_and_s3_path:
             sio.write("aws s3 cp --recursive {log_dir} {s3_dir_path}\n".format(
                 log_dir=local_output_dir,
@@ -391,7 +393,7 @@ class EC2SpotDocker(DockerMode):
         sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_dir_path))
         # Wait for last sync/terminal
         if max_sync_interval > 0:
-            sio.write("sleep {}".format(max_sync_interval))
+            sio.write("sleep {}\n".format(max_sync_interval))
 
         if self.terminate:
             sio.write("""
