@@ -393,7 +393,7 @@ class EC2SpotDocker(DockerMode):
         sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_dir_path))
         # Wait for last sync/terminal
         if max_sync_interval > 0:
-            sio.write("sleep {}\n".format(max_sync_interval))
+            sio.write("sleep {}\n".format(max_sync_interval + 5))
 
         if self.terminate:
             sio.write("""
