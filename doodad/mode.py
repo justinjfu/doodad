@@ -220,6 +220,7 @@ class EC2SpotDocker(DockerMode):
             aws_key_name=None,
             iam_instance_profile_name='doodad',
             s3_log_prefix='experiment',
+            s3_log_name=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
@@ -232,6 +233,7 @@ class EC2SpotDocker(DockerMode):
         self.image_id = image_id
         self.aws_key_name = aws_key_name
         self.s3_log_prefix = s3_log_prefix
+        self.s3_log_name = s3_log_name
         self.iam_instance_profile_name = iam_instance_profile_name
         self.checkpoint = None
 
@@ -258,7 +260,7 @@ class EC2SpotDocker(DockerMode):
         return s3_upload(file_name, bucket, remote_path, dry=dry)
 
     def make_timekey(self):
-        return '_%d'%(int(time.time()*1000))
+        return '%d'%(int(time.time()*1000))
 
     def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
         #dry=True #DRY
@@ -274,10 +276,12 @@ class EC2SpotDocker(DockerMode):
             network_interfaces=[], #config.AWS_NETWORK_INTERFACES,
         )
         aws_config = dict(default_config)
-        exp_name = "{}-{}".format(self.s3_log_prefix, self.make_timekey())
-        # exp_name = 'run'+self.make_timekey()
+        if self.s3_log_name is None:
+            exp_name = "{}-{}".format(self.s3_log_prefix, self.make_timekey())
+        else:
+            exp_name = self.s3_log_name
         exp_prefix = self.s3_log_prefix
-        s3_dir_path = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
+        s3_base_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
@@ -333,7 +337,7 @@ class EC2SpotDocker(DockerMode):
                 # moint_point: directory visible to docker running inside ec2
                 #               spot instance
                 ec2_local_dir = mount.mount_point
-                s3_path = os.path.join(s3_dir_path, mount.s3_path)
+                s3_path = os.path.join(s3_base_dir, mount.s3_path)
                 if mount.output:
                     local_output_dir_and_s3_path.append(
                         (ec2_local_dir, s3_path)
@@ -367,11 +371,11 @@ class EC2SpotDocker(DockerMode):
 
         # Sync all output mounts to s3 after running the docker script
         for (local_output_dir, s3_dir_path) in local_output_dir_and_s3_path:
-            sio.write("aws s3 cp --recursive {log_dir} {s3_dir_path}\n".format(
-                log_dir=local_output_dir,
-                s3_dir_path=s3_dir_path
+            sio.write("aws s3 cp --recursive {local_dir} {s3_dir}\n".format(
+                local_dir=local_output_dir,
+                s3_dir=s3_dir_path
             ))
-        sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_dir_path))
+        sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_base_dir))
 
         # Wait for last sync
         if max_sync_interval > 0:
