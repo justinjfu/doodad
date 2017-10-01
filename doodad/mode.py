@@ -351,8 +351,8 @@ class EC2SpotDocker(DockerMode):
                 while /bin/true; do
                     aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
                     sleep {periodic_sync_interval}
-                done & echo sync
-                initiated""".format(include_string=mount.include_string,
+                done & echo sync initiated
+                """.format(include_string=mount.include_string,
                     log_dir=ec2_local_dir, s3_path=s3_path,
                     periodic_sync_interval=mount.sync_interval))
                 max_sync_interval = max(max_sync_interval, mount.sync_interval)
@@ -427,7 +427,7 @@ class EC2SpotDocker(DockerMode):
 
         if verbose:
             print(full_script)
-        # print(full_script)
+        print(full_script)
         with open("/tmp/full_script", "w") as f:
             f.write(full_script)
 
