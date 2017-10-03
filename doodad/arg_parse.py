@@ -22,7 +22,7 @@ def __get_arg_config():
     __ARGS = args
     """
     args_data = os.environ.get(ARGS_DATA, {})
-    use_cloudpickle = os.environ.get(USE_CLOUDPICKLE, True)
+    use_cloudpickle = os.environ.get(USE_CLOUDPICKLE, False)
 
     args = lambda : None # hack - use function as namespace
     args.args_data = args_data
@@ -46,7 +46,7 @@ def get_args(key=None, default=None):
         return data.get(key, default)
     return data
 
-def encode_args(call_args, cloudpickle=True):
+def encode_args(call_args, cloudpickle=False):
     """
     Encode call_args dictionary as a base64 string
     """
