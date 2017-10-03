@@ -338,10 +338,11 @@ class EC2SpotDocker(DockerMode):
                 #               spot instance
                 ec2_local_dir = mount.mount_point
                 s3_path = os.path.join(s3_base_dir, mount.s3_path)
-                if mount.output:
-                    local_output_dir_and_s3_path.append(
-                        (ec2_local_dir, s3_path)
-                    )
+                if not mount.output:
+                    raise NotImplementedError()
+                local_output_dir_and_s3_path.append(
+                    (ec2_local_dir, s3_path)
+                )
                 sio.write("mkdir -p {remote_dir}\n".format(
                     remote_dir=ec2_local_dir)
                 )
@@ -353,10 +354,39 @@ class EC2SpotDocker(DockerMode):
                     aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
                     sleep {periodic_sync_interval}
                 done & echo sync initiated
-                """.format(include_string=mount.include_string,
-                    log_dir=ec2_local_dir, s3_path=s3_path,
-                    periodic_sync_interval=mount.sync_interval))
+                """.format(
+                    include_string=mount.include_string,
+                    log_dir=ec2_local_dir,
+                    s3_path=s3_path,
+                    periodic_sync_interval=mount.sync_interval
+                ))
                 max_sync_interval = max(max_sync_interval, mount.sync_interval)
+
+                # Sync on terminate. This catches the case where the spot
+                # instance gets terminated before the user script ends.
+                #
+                # This is hoping that there's at least 3 seconds between when
+                # the spot instance gets marked for  termination and when it
+                # actually terminates.
+                sio.write("""
+                    while /bin/true; do
+                        if [ -z $(curl -Is http://169.254.169.254/latest/meta-data/spot/termination-time | head -1 | grep 404 | cut -d \  -f 2) ]
+                        then
+                            logger "Running shutdown hook."
+                            aws s3 cp --recursive {log_dir} {s3_path}
+                            break
+                        else
+                            # Spot instance not yet marked for termination.
+                            # This is hoping that there's at least 3 seconds
+                            # between when the spot instance gets marked for
+                            # termination and when it actually terminates.
+                            sleep 3
+                        fi
+                    done & echo log sync initiated
+                """.format(
+                    log_dir=ec2_local_dir,
+                    s3_path=s3_path,
+                ))
             else:
                 raise NotImplementedError()
 
@@ -369,7 +399,10 @@ class EC2SpotDocker(DockerMode):
             docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
         sio.write(docker_cmd+'\n')
 
-        # Sync all output mounts to s3 after running the docker script
+        # Sync all output mounts to s3 after running the user script
+        # Ideally the earlier while loop would be sufficient, but it might be
+        # the case that the earlier while loop isn't fast enough to catch a
+        # termination. So, we explicitly sync on termination.
         for (local_output_dir, s3_dir_path) in local_output_dir_and_s3_path:
             sio.write("aws s3 cp --recursive {local_dir} {s3_dir}\n".format(
                 local_dir=local_output_dir,
