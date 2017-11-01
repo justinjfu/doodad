@@ -25,7 +25,7 @@ if ACCESS_KEY is None:
 ACCESS_SECRET = os.environ.get("AWS_ACCESS_SECRET", None)
 if ACCESS_SECRET is None:
     raise ValueError('Please set the $AWS_ACCESS_KEY environment variable')
-S3_BUCKET_NAME = os.environ.get("$DOODAD_S3_BUCKET", None)
+S3_BUCKET_NAME = os.environ.get("DOODAD_S3_BUCKET", None)
 if S3_BUCKET_NAME is None:
     raise ValueError('Please set the $DOODAD_S3_BUCKET environment variable')
 PREFIX = os.environ.get("RLLAB_PREFIX", "")
