@@ -251,7 +251,8 @@ class EC2SpotDocker(DockerMode):
         f.write(script_content.encode())
         f.close()
         remote_path = os.path.join(self.s3_mount_path, 'oversize_bash_scripts', str(uuid.uuid4()))
-        subprocess.check_call(["aws", "s3", "cp", f.name, remote_path, '--region %s'%self.region])
+        subprocess.check_call(["aws", "s3", "cp", f.name, remote_path,
+                               '--region', self.region])
         os.unlink(f.name)
         return remote_path
 
