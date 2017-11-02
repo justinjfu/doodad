@@ -28,21 +28,39 @@ def launch_python(
         target_mount_dir='target',
         verbose=False,
         use_cloudpickle=False,
+        target_mount=None,
 ):
+    """
+
+    :param target: Path to script to run.
+    :param python_cmd:
+    :param mode:
+    :param mount_points:
+    :param args:
+    :param env:
+    :param dry:
+    :param fake_display:
+    :param target_mount_dir:
+    :param verbose:
+    :param use_cloudpickle:
+    :param target_mount: If set, ignore target and just use this as the target.
+    :return:
+    """
     if args is None:
         args = {}
     if mount_points is None:
         mount_points = []
 
-    # mount
-    target_dir = os.path.dirname(target)
-    if not target_mount_dir:
-        target_mount_dir = target_dir
-    target_mount_dir = os.path.join(target_mount_dir, os.path.basename(target_dir))
-    if isinstance(mode, Local):
-        target_mount = MountLocal(local_dir=target_dir)
-    else:
-        target_mount = MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
+    if target_mount is None:
+        # mount
+        target_dir = os.path.dirname(target)
+        if not target_mount_dir:
+            target_mount_dir = target_dir
+        target_mount_dir = os.path.join(target_mount_dir, os.path.basename(target_dir))
+        if isinstance(mode, Local):
+            target_mount = MountLocal(local_dir=target_dir)
+        else:
+            target_mount = MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
     mount_points = mount_points + [target_mount]
     target_full_path = os.path.join(target_mount.docker_mount_dir(), os.path.basename(target))
 
@@ -54,6 +72,7 @@ def launch_python(
         use_cloudpickle=use_cloudpickle,
     )
     mode.launch_command(command, mount_points=mount_points, dry=dry, verbose=verbose)
+    return target_mount
 
 HEADLESS = 'xvfb-run -a -s "-ac -screen 0 1400x900x24 +extension RANDR"'
 def make_python_command(

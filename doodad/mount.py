@@ -17,13 +17,15 @@ class Mount(object):
     Args:
         mount_point (str): Location of directory visible to the running process
         pythonpath (bool): If True, adds this folder to the $PYTHON_PATH environment variable
-        output (bool): If False, this is a "code" directory. If True, this should be an empty 
+        output (bool): If False, this is a "code" directory. If True, this should be an empty
             "output" directory (nothing will be copied to remote)
     """
     def __init__(self, mount_point=None, pythonpath=False, output=False):
         self.pythonpath = pythonpath
         self.read_only = not output
         self.set_mount(mount_point)
+        self.path_on_remote = None
+        self.local_file_hash = None
 
     def set_mount(self, mount_point):
         if mount_point:
@@ -33,7 +35,7 @@ class Mount(object):
 
 
 class MountLocal(Mount):
-    def __init__(self, local_dir, mount_point=None, cleanup=True, 
+    def __init__(self, local_dir, mount_point=None, cleanup=True,
                 filter_ext=('.pyc', '.log', '.git', '.mp4'),
                 filter_dir=('data',),
                 **kwargs):
@@ -49,7 +51,7 @@ class MountLocal(Mount):
         else:
             self.no_remount = False
         #print('local_dir %s, mount_point %s(%s)' % (self.local_dir, self.mount_point, mount_point))
-    
+
     def create_if_nonexistent(self):
         os.makedirs(self.local_dir, exist_ok=True)
 
@@ -88,7 +90,7 @@ class MountGitRepo(Mount):
 
 
 class MountS3(Mount):
-    def __init__(self, s3_path, s3_bucket=None, sync_interval=15, output=False, 
+    def __init__(self, s3_path, s3_bucket=None, sync_interval=15, output=False,
             include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), **kwargs):
         super(MountS3, self).__init__(**kwargs)
         if s3_bucket is None:
