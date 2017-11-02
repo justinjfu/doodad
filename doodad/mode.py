@@ -317,12 +317,18 @@ class EC2SpotDocker(DockerMode):
             print('Handling mount: ', mount)
             if isinstance(mount, MountLocal):  # TODO: these should be mount_s3 objects
                 if mount.read_only:
-                    with mount.gzip() as gzip_file:
-                        gzip_path = os.path.realpath(gzip_file)
-                        file_hash = hash_file(gzip_path)
-                        s3_path = self.s3_upload(gzip_path, self.s3_bucket, remote_filename=file_hash+'.tar')
-                        remote_tar_name = '/tmp/'+file_hash+'.tar'
-                        remote_unpack_name = '/tmp/'+file_hash
+                    if mount.path_on_remote is None:
+                        with mount.gzip() as gzip_file:
+                            gzip_path = os.path.realpath(gzip_file)
+                            file_hash = hash_file(gzip_path)
+                            s3_path = self.s3_upload(gzip_path, self.s3_bucket, remote_filename=file_hash+'.tar')
+                        mount.path_on_remote = s3_path
+                        mount.local_file_hash = gzip_path
+                    else:
+                        file_hash = mount.local_file_hash
+                        s3_path = mount.path_on_remote
+                    remote_tar_name = '/tmp/'+file_hash+'.tar'
+                    remote_unpack_name = '/tmp/'+file_hash
                     sio.write("aws s3 cp {s3_path} {remote_tar_name}\n".format(s3_path=s3_path, remote_tar_name=remote_tar_name))
                     sio.write("mkdir -p {local_code_path}\n".format(local_code_path=remote_unpack_name))
                     sio.write("tar -xvf {remote_tar_name} -C {local_code_path}\n".format(
