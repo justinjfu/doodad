@@ -4,6 +4,9 @@ import tempfile
 import uuid
 import time
 import base64
+
+from doodad.ec2.autoconfig import AUTOCONFIG
+
 try:
     from StringIO import StringIO
 except ImportError:
@@ -270,17 +273,17 @@ class EC2SpotDocker(DockerMode):
         return '%d'%(int(time.time()*1000))
 
     def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
-        #dry=True #DRY
 
+        region_security_id = AUTOCONFIG.aws_security_group_ids()[self.region]
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
             key_name=self.aws_key_name,
             spot_price=self.spot_price,
             iam_instance_profile_name=self.iam_instance_profile_name,
-            security_groups=[], #config.AWS_SECURITY_GROUPS,
-            security_group_ids=[], #config.AWS_SECURITY_GROUP_IDS,
-            network_interfaces=[], #config.AWS_NETWORK_INTERFACES,
+            security_groups=AUTOCONFIG.aws_security_groups(),
+            security_group_ids=[region_security_id],
+            network_interfaces=[],
         )
         aws_config = dict(default_config)
         if self.s3_log_name is None:
