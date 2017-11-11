@@ -134,7 +134,7 @@ class LocalDocker(DockerMode):
                 if mount.pythonpath:
                     py_path.append(mount_pnt)
             else:
-                raise NotImplementedError()
+                raise NotImplementedError(type(mount))
 
         full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path,
                 checkpoint=self.checkpoints)
