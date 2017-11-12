@@ -22,7 +22,6 @@ class DoodadSweeper(object):
             ):
 
         self.image = docker_img
-        print(docker_img)
         self.mode_local = doodad.mode.LocalDocker(image=docker_img)
 
         # always include doodad
