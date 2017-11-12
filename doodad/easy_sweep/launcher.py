@@ -42,6 +42,10 @@ class DoodadSweeper(object):
                          mounts=self.mounts+[self.mount_out_local],
                          test_one=True)
 
+    def run_single_docker(self, run_method, kwargs):
+        run_single_doodad(run_method, kwargs, run_mode=self.mode_local,
+                         mounts=self.mounts+[self.mount_out_local])
+
     def run_sweep_ec2(self, run_method, params, bucket_name, 
                       s3_log_name=None, add_date_to_logname=True,
                       region='us-east-2', instance_type='c4.xlarge', repeat=1):
@@ -62,6 +66,25 @@ class DoodadSweeper(object):
         run_sweep_doodad(run_method, params, run_mode=mode_ec2, 
                 mounts=self.mounts+[self.mount_out_s3], repeat=repeat)
 
+    def run_single_ec2(self, run_method, kwargs, bucket_name, 
+                      s3_log_name=None, add_date_to_logname=True,
+                      region='us-east-2', instance_type='c4.xlarge'):
+        if s3_log_name is None:
+            s3_log_name = 'unnamed_experiment'
+        if add_date_to_logname:
+            datestamp = datetime.now().strftime('%Y_%m_%d')
+            s3_log_name = '%s_%s' % (datestamp, s3_log_name)
+
+        mode_ec2 = doodad.mode.EC2AutoconfigDocker(
+            image=self.image,
+            region=region,
+            s3_bucket=bucket_name,
+            instance_type=instance_type,
+            spot_price=INSTANCE_TO_PRICE[instance_type],
+            s3_log_prefix=s3_log_name,
+        )
+        run_single_doodad(run_method, kwargs, run_mode=mode_ec2, 
+                mounts=self.mounts+[self.mount_out_s3])
 
 if __name__ == "__main__":
     # test

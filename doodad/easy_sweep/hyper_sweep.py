@@ -79,6 +79,20 @@ def run_sweep_doodad(run_method, params, run_mode, mounts, repeat=1, test_one=Fa
             break
 
 
+def run_single_doodad(run_method, kwargs, run_mode, mounts, repeat=1):
+    """ Run a single function via doodad """
+    sweeper = Sweeper(params, repeat)
+    def run_method_args():
+        run_method(**kwargs)
+    doodad.launch_python(
+            target = os.path.join(SCRIPTS_DIR, 'run_experiment_lite_doodad.py'),
+            mode=run_mode,
+            mount_points=mounts,
+            use_cloudpickle=True,
+            args = {'run_method': run_method_args},
+    )
+
+
 if __name__ == "__main__":
     def example_run_method(exp_name, param1, param2='a', param3=3, param4=4):
         import time
