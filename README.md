@@ -31,7 +31,7 @@ See [ec2_launch_test.py](https://github.com/justinjfu/doodad/blob/master/example
 
 ## Tutorial
 
-See the [wiki](https://github.com/justinjfu/doodad/wiki/Tutorial)
+See the [wiki](https://github.com/justinjfu/doodad/wiki/Home)
 
 ## TODOs
 - Add support for automatic experiment restarting (will require the user to write a save_state and restore_state function, or use something like CRIU)
