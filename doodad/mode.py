@@ -230,9 +230,15 @@ class EC2SpotDocker(DockerMode):
             iam_instance_profile_name='doodad',
             s3_log_prefix='experiment',
             s3_log_name=None,
+            security_group_ids=None,
+            security_groups=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
+        if security_group_ids is None:
+            security_group_ids = []
+        if security_groups is None:
+            security_groups = []
         self.credentials = credentials
         self.region = region
         self.spot_price = str(float(spot_price))
@@ -243,6 +249,8 @@ class EC2SpotDocker(DockerMode):
         self.aws_key_name = aws_key_name
         self.s3_log_prefix = s3_log_prefix
         self.s3_log_name = s3_log_name
+        self.security_group_ids = security_group_ids
+        self.security_groups = security_groups
         self.iam_instance_profile_name = iam_instance_profile_name
         self.checkpoint = None
 
@@ -273,16 +281,14 @@ class EC2SpotDocker(DockerMode):
         return '%d'%(int(time.time()*1000))
 
     def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
-
-        region_security_id = AUTOCONFIG.aws_security_group_ids()[self.region]
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
             key_name=self.aws_key_name,
             spot_price=self.spot_price,
             iam_instance_profile_name=self.iam_instance_profile_name,
-            security_groups=AUTOCONFIG.aws_security_groups(),
-            security_group_ids=[region_security_id],
+            security_groups=self.security_groups,
+            security_group_ids=self.security_group_ids,
             network_interfaces=[],
         )
         aws_config = dict(default_config)
@@ -554,6 +560,8 @@ class EC2AutoconfigDocker(EC2SpotDocker):
         aws_key_name= AUTOCONFIG.aws_key_name(region)
         iam_profile= AUTOCONFIG.iam_profile_name()
         credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
+        security_group_ids = [AUTOCONFIG.aws_security_group_ids()[region]]
+        security_groups = AUTOCONFIG.aws_security_groups()
         super(EC2AutoconfigDocker, self).__init__(
                 s3_bucket=s3_bucket,
                 image_id=image_id,
@@ -561,6 +569,8 @@ class EC2AutoconfigDocker(EC2SpotDocker):
                 iam_instance_profile_name=iam_profile,
                 credentials=credentials,
                 region=region,
+                security_groups=security_groups,
+                security_group_ids=security_group_ids,
                 **kwargs
                 )
 
