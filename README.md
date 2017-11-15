@@ -3,6 +3,8 @@
 
 A library for launching python programs on different machines. Currently supports running locally and over EC2 and SSH (via Docker) with minimal (if any) modification to your existing program.
 
+EC2 code is based on [rllab](https://github.com/rll/rllab/)'s code.
+
 
 ## Setup
 
@@ -18,7 +20,6 @@ pip install -r requirements.txt
 
 - (Optional) Set up EC2
 ```
-pip install --upgrade --user awscli
 python scripts/ec2_setup.py
 ```
 
