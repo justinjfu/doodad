@@ -3,6 +3,8 @@
 
 A library for launching python programs on different machines. Currently supports running locally and over EC2 and SSH (via Docker) with minimal (if any) modification to your existing program.
 
+EC2 code is based on [rllab](https://github.com/rll/rllab/)'s code.
+
 
 ## Setup
 
@@ -18,7 +20,6 @@ pip install -r requirements.txt
 
 - (Optional) Set up EC2
 ```
-pip install --upgrade --user awscli
 python scripts/ec2_setup.py
 ```
 
@@ -31,7 +32,7 @@ See [ec2_launch_test.py](https://github.com/justinjfu/doodad/blob/master/example
 
 ## Tutorial
 
-See the [wiki](https://github.com/justinjfu/doodad/wiki/Tutorial)
+See the [wiki](https://github.com/justinjfu/doodad/wiki/Home)
 
 ## TODOs
 - Add support for automatic experiment restarting (will require the user to write a save_state and restore_state function, or use something like CRIU)

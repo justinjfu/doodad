@@ -1,7 +1,7 @@
 import os
 
 from .mode import LOCAL, Local
-from .arg_parse import encode_args, ARGS_DATA
+from .arg_parse import encode_args, ARGS_DATA, USE_CLOUDPICKLE, CLOUDPICKLE_VERSION
 from .mount import MountLocal
 
 
@@ -88,8 +88,12 @@ def make_python_command(
     else:
         cmd = '%s %s' % (python_cmd, target)
 
-    args_encoded = encode_args(args, cloudpickle=use_cloudpickle)
+    args_encoded, cp_version = encode_args(args, cloudpickle=use_cloudpickle)
     if args:
-        cmd = '%s=%s %s' % (ARGS_DATA, args_encoded, cmd)
+        cmd = '%s=%s %s=%s %s=%s %s' % (ARGS_DATA, args_encoded, 
+                USE_CLOUDPICKLE, str(int(use_cloudpickle)), 
+                CLOUDPICKLE_VERSION, cp_version,
+                cmd)
+
     return cmd
 
