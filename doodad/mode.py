@@ -227,6 +227,7 @@ class EC2SpotDocker(DockerMode):
             iam_instance_profile_name='doodad',
             s3_log_prefix='experiment',
             s3_log_name=None,
+            aws_s3_path=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
@@ -244,7 +245,7 @@ class EC2SpotDocker(DockerMode):
         self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
-        self.aws_s3_path = 's3://%s/doodad/logs' % self.s3_bucket
+        self.aws_s3_path = aws_s3_path or 's3://%s/doodad/logs' % self.s3_bucket
 
     def upload_file_to_s3(self, script_content, dry=False):
         f = tempfile.NamedTemporaryFile(delete=False)
@@ -541,13 +542,14 @@ class EC2AutoconfigDocker(EC2SpotDocker):
     def __init__(self,
             region='us-west-1',
             s3_bucket=None,
+            image_id=None,
             **kwargs
             ):
         # find config file
         from doodad.ec2.autoconfig import AUTOCONFIG
         from doodad.ec2.credentials import AWSCredentials
         s3_bucket = AUTOCONFIG.s3_bucket() if s3_bucket is None else s3_bucket
-        image_id = AUTOCONFIG.aws_image_id(region)
+        image_id = image_id or AUTOCONFIG.aws_image_id(region)
         aws_key_name= AUTOCONFIG.aws_key_name(region)
         iam_profile= AUTOCONFIG.iam_profile_name()
         credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
