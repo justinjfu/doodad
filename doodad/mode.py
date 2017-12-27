@@ -218,6 +218,7 @@ class EC2SpotDocker(DockerMode):
     def __init__(self,
             credentials,
             region='us-west-1',
+            s3_bucket_region='us-west-1',
             instance_type='m1.small',
             spot_price=0.0,
             s3_bucket=None,
@@ -232,6 +233,7 @@ class EC2SpotDocker(DockerMode):
         super(EC2SpotDocker, self).__init__(**kwargs)
         self.credentials = credentials
         self.region = region
+        self.s3_bucket_region = s3_bucket_region
         self.spot_price = str(float(spot_price))
         self.instance_type = instance_type
         self.terminate = terminate
@@ -252,7 +254,7 @@ class EC2SpotDocker(DockerMode):
         f.close()
         remote_path = os.path.join(self.s3_mount_path, 'oversize_bash_scripts', str(uuid.uuid4()))
         subprocess.check_call(["aws", "s3", "cp", f.name, remote_path,
-                               '--region', self.region])
+                               '--region', self.s3_bucket_region])
         os.unlink(f.name)
         return remote_path
 
@@ -261,10 +263,11 @@ class EC2SpotDocker(DockerMode):
             remote_filename = os.path.basename(file_name)
         remote_path = 'doodad/mount/'+remote_filename
         if check_exist:
-            if s3_exists(bucket, remote_path, region=self.region):
+            if s3_exists(bucket, remote_path, region=self.s3_bucket_region):
                 print('\t%s exists! ' % os.path.join(bucket, remote_path))
                 return 's3://'+os.path.join(bucket, remote_path)
-        return s3_upload(file_name, bucket, remote_path, dry=dry, region=self.region)
+        return s3_upload(file_name, bucket, remote_path, dry=dry,
+                         region=self.s3_bucket_region)
 
     def make_timekey(self):
         return '%d'%(int(time.time()*1000))
@@ -303,7 +306,7 @@ class EC2SpotDocker(DockerMode):
         """.format(exp_prefix=exp_prefix, aws_region=self.region))
         sio.write("service docker start\n")
         sio.write("docker --config /home/ubuntu/.docker pull {docker_image}\n".format(docker_image=self.docker_image))
-        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.region))
+        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.s3_bucket_region))
         sio.write("""
             curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
             unzip awscli-bundle.zip
@@ -475,7 +478,7 @@ class EC2SpotDocker(DockerMode):
             aws s3 cp {s3_path} /home/ubuntu/remote_script.sh --region {aws_region} && \\
             chmod +x /home/ubuntu/remote_script.sh && \\
             bash /home/ubuntu/remote_script.sh
-            """.format(s3_path=s3_path, aws_region=self.region))
+            """.format(s3_path=s3_path, aws_region=self.s3_bucket_region))
             user_data = dedent(sio.getvalue())
         else:
             user_data = full_script
