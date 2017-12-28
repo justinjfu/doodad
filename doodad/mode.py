@@ -233,7 +233,7 @@ class EC2SpotDocker(DockerMode):
             security_group_ids=None,
             security_groups=None,
             aws_s3_path=None,
-            availability_zone=None,
+            extra_ec2_instance_kwargs=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
@@ -254,7 +254,7 @@ class EC2SpotDocker(DockerMode):
         self.security_group_ids = security_group_ids
         self.security_groups = security_groups
         self.iam_instance_profile_name = iam_instance_profile_name
-        self.availability_zone = availability_zone
+        self.extra_ec2_instance_kwargs = extra_ec2_instance_kwargs
         self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
@@ -512,10 +512,8 @@ class EC2SpotDocker(DockerMode):
             ),
             #**config.AWS_EXTRA_CONFIGS,
         )
-        if self.availability_zone is not None:
-            instance_args['Placement'] = dict(
-                AvailabilityZone=self.availability_zone,
-            )
+        if self.extra_ec2_instance_kwargs is not None:
+            instance_args.update(self.extra_ec2_instance_kwargs)
 
         if verbose:
             print("************************************************************")
