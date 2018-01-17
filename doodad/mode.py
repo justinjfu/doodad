@@ -541,15 +541,18 @@ class EC2AutoconfigDocker(EC2SpotDocker):
     def __init__(self,
             region='us-west-1',
             s3_bucket=None,
+            image_id=None,
+            aws_key_name=None,
+            iam_profile=None,
             **kwargs
             ):
         # find config file
         from doodad.ec2.autoconfig import AUTOCONFIG
         from doodad.ec2.credentials import AWSCredentials
         s3_bucket = AUTOCONFIG.s3_bucket() if s3_bucket is None else s3_bucket
-        image_id = AUTOCONFIG.aws_image_id(region)
-        aws_key_name= AUTOCONFIG.aws_key_name(region)
-        iam_profile= AUTOCONFIG.iam_profile_name()
+        image_id = AUTOCONFIG.aws_image_id(region) if image_id is None else image_id
+        aws_key_name= AUTOCONFIG.aws_key_name(region) if aws_key_name is None else aws_key_name
+        iam_profile= AUTOCONFIG.iam_profile_name() if iam_profile is None else iam_profile
         credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
         super(EC2AutoconfigDocker, self).__init__(
                 s3_bucket=s3_bucket,
