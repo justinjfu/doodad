@@ -234,6 +234,7 @@ class EC2SpotDocker(DockerMode):
             security_group_ids=None,
             security_groups=None,
             aws_s3_path=None,
+            extra_ec2_instance_kwargs=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
@@ -255,6 +256,7 @@ class EC2SpotDocker(DockerMode):
         self.security_group_ids = security_group_ids
         self.security_groups = security_groups
         self.iam_instance_profile_name = iam_instance_profile_name
+        self.extra_ec2_instance_kwargs = extra_ec2_instance_kwargs
         self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
@@ -305,6 +307,7 @@ class EC2SpotDocker(DockerMode):
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
+        sio.write("truncate -s 0 /home/ubuntu/user_data.log\n")
         sio.write("{\n")
         sio.write('die() { status=$1; shift; echo "FATAL: $*"; exit $status; }\n')
         sio.write('EC2_INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"\n')
@@ -512,6 +515,8 @@ class EC2SpotDocker(DockerMode):
             ),
             #**config.AWS_EXTRA_CONFIGS,
         )
+        if self.extra_ec2_instance_kwargs is not None:
+            instance_args.update(self.extra_ec2_instance_kwargs)
 
         if verbose:
             print("************************************************************")
