@@ -572,8 +572,9 @@ class EC2AutoconfigDocker(EC2SpotDocker):
         aws_key_name= AUTOCONFIG.aws_key_name(region) if aws_key_name is None else aws_key_name
         iam_profile= AUTOCONFIG.iam_profile_name() if iam_profile is None else iam_profile
         credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
-        security_group_ids = [AUTOCONFIG.aws_security_group_ids()[region]]
+        security_group_ids = AUTOCONFIG.aws_security_group_ids()[region]
         security_groups = AUTOCONFIG.aws_security_groups()
+
         super(EC2AutoconfigDocker, self).__init__(
                 s3_bucket=s3_bucket,
                 image_id=image_id,
