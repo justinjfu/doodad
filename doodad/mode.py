@@ -4,6 +4,9 @@ import tempfile
 import uuid
 import time
 import base64
+
+from doodad.ec2.autoconfig import AUTOCONFIG
+
 try:
     from StringIO import StringIO
 except ImportError:
@@ -218,6 +221,7 @@ class EC2SpotDocker(DockerMode):
     def __init__(self,
             credentials,
             region='us-west-1',
+            s3_bucket_region='us-west-1',
             instance_type='m1.small',
             spot_price=0.0,
             s3_bucket=None,
@@ -227,11 +231,20 @@ class EC2SpotDocker(DockerMode):
             iam_instance_profile_name='doodad',
             s3_log_prefix='experiment',
             s3_log_name=None,
+            security_group_ids=None,
+            security_groups=None,
+            aws_s3_path=None,
+            extra_ec2_instance_kwargs=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
+        if security_group_ids is None:
+            security_group_ids = []
+        if security_groups is None:
+            security_groups = []
         self.credentials = credentials
         self.region = region
+        self.s3_bucket_region = s3_bucket_region
         self.spot_price = str(float(spot_price))
         self.instance_type = instance_type
         self.terminate = terminate
@@ -240,11 +253,14 @@ class EC2SpotDocker(DockerMode):
         self.aws_key_name = aws_key_name
         self.s3_log_prefix = s3_log_prefix
         self.s3_log_name = s3_log_name
+        self.security_group_ids = security_group_ids
+        self.security_groups = security_groups
         self.iam_instance_profile_name = iam_instance_profile_name
+        self.extra_ec2_instance_kwargs = extra_ec2_instance_kwargs
         self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
-        self.aws_s3_path = 's3://%s/doodad/logs' % self.s3_bucket
+        self.aws_s3_path = aws_s3_path or 's3://%s/doodad/logs' % self.s3_bucket
 
     def upload_file_to_s3(self, script_content, dry=False):
         f = tempfile.NamedTemporaryFile(delete=False)
@@ -252,7 +268,7 @@ class EC2SpotDocker(DockerMode):
         f.close()
         remote_path = os.path.join(self.s3_mount_path, 'oversize_bash_scripts', str(uuid.uuid4()))
         subprocess.check_call(["aws", "s3", "cp", f.name, remote_path,
-                               '--region', self.region])
+                               '--region', self.s3_bucket_region])
         os.unlink(f.name)
         return remote_path
 
@@ -261,26 +277,25 @@ class EC2SpotDocker(DockerMode):
             remote_filename = os.path.basename(file_name)
         remote_path = 'doodad/mount/'+remote_filename
         if check_exist:
-            if s3_exists(bucket, remote_path, region=self.region):
+            if s3_exists(bucket, remote_path, region=self.s3_bucket_region):
                 print('\t%s exists! ' % os.path.join(bucket, remote_path))
                 return 's3://'+os.path.join(bucket, remote_path)
-        return s3_upload(file_name, bucket, remote_path, dry=dry, region=self.region)
+        return s3_upload(file_name, bucket, remote_path, dry=dry,
+                         region=self.s3_bucket_region)
 
     def make_timekey(self):
         return '%d'%(int(time.time()*1000))
 
     def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
-        #dry=True #DRY
-
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
             key_name=self.aws_key_name,
             spot_price=self.spot_price,
             iam_instance_profile_name=self.iam_instance_profile_name,
-            security_groups=[], #config.AWS_SECURITY_GROUPS,
-            security_group_ids=[], #config.AWS_SECURITY_GROUP_IDS,
-            network_interfaces=[], #config.AWS_NETWORK_INTERFACES,
+            security_groups=self.security_groups,
+            security_group_ids=self.security_group_ids,
+            network_interfaces=[],
         )
         aws_config = dict(default_config)
         if self.s3_log_name is None:
@@ -292,6 +307,7 @@ class EC2SpotDocker(DockerMode):
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
+        sio.write("truncate -s 0 /home/ubuntu/user_data.log\n")
         sio.write("{\n")
         sio.write('die() { status=$1; shift; echo "FATAL: $*"; exit $status; }\n')
         sio.write('EC2_INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"\n')
@@ -303,7 +319,7 @@ class EC2SpotDocker(DockerMode):
         """.format(exp_prefix=exp_prefix, aws_region=self.region))
         sio.write("service docker start\n")
         sio.write("docker --config /home/ubuntu/.docker pull {docker_image}\n".format(docker_image=self.docker_image))
-        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.region))
+        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.s3_bucket_region))
         sio.write("""
             curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
             unzip awscli-bundle.zip
@@ -475,7 +491,7 @@ class EC2SpotDocker(DockerMode):
             aws s3 cp {s3_path} /home/ubuntu/remote_script.sh --region {aws_region} && \\
             chmod +x /home/ubuntu/remote_script.sh && \\
             bash /home/ubuntu/remote_script.sh
-            """.format(s3_path=s3_path, aws_region=self.region))
+            """.format(s3_path=s3_path, aws_region=self.s3_bucket_region))
             user_data = dedent(sio.getvalue())
         else:
             user_data = full_script
@@ -499,6 +515,8 @@ class EC2SpotDocker(DockerMode):
             ),
             #**config.AWS_EXTRA_CONFIGS,
         )
+        if self.extra_ec2_instance_kwargs is not None:
+            instance_args.update(self.extra_ec2_instance_kwargs)
 
         if verbose:
             print("************************************************************")
@@ -554,6 +572,8 @@ class EC2AutoconfigDocker(EC2SpotDocker):
         aws_key_name= AUTOCONFIG.aws_key_name(region) if aws_key_name is None else aws_key_name
         iam_profile= AUTOCONFIG.iam_profile_name() if iam_profile is None else iam_profile
         credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
+        security_group_ids = [AUTOCONFIG.aws_security_group_ids()[region]]
+        security_groups = AUTOCONFIG.aws_security_groups()
         super(EC2AutoconfigDocker, self).__init__(
                 s3_bucket=s3_bucket,
                 image_id=image_id,
@@ -561,6 +581,8 @@ class EC2AutoconfigDocker(EC2SpotDocker):
                 iam_instance_profile_name=iam_profile,
                 credentials=credentials,
                 region=region,
+                security_groups=security_groups,
+                security_group_ids=security_group_ids,
                 **kwargs
                 )
 

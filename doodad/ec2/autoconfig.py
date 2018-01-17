@@ -18,7 +18,10 @@ class Autoconfig(object):
         return self.config['default']['iam_instance_profile_name']
 
     def aws_security_groups(self):
-        return self.config['default']['aws_security_groups']
+        return self.config['default']['aws_security_groups'].split(',')
+
+    def aws_security_group_ids(self):
+        return dict(self.config['aws_security_group_ids'])
 
     def aws_access_key(self):
         return self.config['default']['aws_access_key']
