@@ -10,10 +10,11 @@ def launch_shell(
     mode=LOCAL,
     dry=False,
     mount_points=None,
+    verbose=False,
     ):
     if mount_points is None:
         mount_points = []
-    mode.launch_command(command, dry=dry)
+    mode.launch_command(command, mount_points=mount_points, dry=dry, verbose=verbose)
 
 
 def launch_python(
