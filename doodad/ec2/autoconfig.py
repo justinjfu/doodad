@@ -1,5 +1,6 @@
 import configparser
 import os
+import json
 
 from doodad.utils import REPO_DIR
 
@@ -18,7 +19,14 @@ class Autoconfig(object):
         return self.config['default']['iam_instance_profile_name']
 
     def aws_security_groups(self):
-        return self.config['default']['aws_security_groups']
+        return self.config['default']['aws_security_groups'].split(',')
+
+    def aws_security_group_ids(self):
+        id_dict = dict(self.config['aws_security_group_ids'])
+        for k in id_dict:
+            #json.loads(id_dict[k])
+            id_dict[k] = eval(id_dict[k]) #TODO: Get rid of eval
+        return id_dict
 
     def aws_access_key(self):
         return self.config['default']['aws_access_key']

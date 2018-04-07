@@ -4,6 +4,9 @@ import tempfile
 import uuid
 import time
 import base64
+
+from doodad.ec2.autoconfig import AUTOCONFIG
+
 try:
     from StringIO import StringIO
 except ImportError:
@@ -25,7 +28,7 @@ class Local(LaunchMode):
         self.env = {}
 
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
-        if dry: 
+        if dry:
             print(cmd); return
 
         commands = CommandBuilder()
@@ -66,10 +69,11 @@ LOCAL = Local()
 
 
 class DockerMode(LaunchMode):
-    def __init__(self, image='ubuntu:16.04'):
+    def __init__(self, image='ubuntu:16.04', gpu=False):
         super(DockerMode, self).__init__()
         self.docker_image = image
         self.docker_name = uuid.uuid4()
+        self.gpu = gpu
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
             checkpoint=False, no_root=False):
@@ -78,7 +82,10 @@ class DockerMode(LaunchMode):
             cmd_list.extend(pre_cmd)
 
         if verbose:
-            cmd_list.append('echo \"Running in docker\"')
+            if self.gpu:
+                cmd_list.append('echo \"Running in docker (gpu)\"')
+            else:
+                cmd_list.append('echo \"Running in docker\"')
         if pythonpath:
             cmd_list.append('export PYTHONPATH=$PYTHONPATH:%s' % (':'.join(pythonpath)))
         if no_root:
@@ -106,6 +113,8 @@ class DockerMode(LaunchMode):
             docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
         else:
             docker_prefix = 'docker run %s %s /bin/bash -c ' % (extra_args, self.docker_image)
+        if self.gpu:
+            docker_prefix = 'nvidia-'+docker_prefix
         main_cmd = cmd_list.to_string()
         full_cmd = docker_prefix + ("\'%s\'" % main_cmd)
         return full_cmd
@@ -128,9 +137,9 @@ class LocalDocker(DockerMode):
                 if mount.pythonpath:
                     py_path.append(mount_pnt)
             else:
-                raise NotImplementedError()
+                raise NotImplementedError(type(mount))
 
-        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path, 
+        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path,
                 checkpoint=self.checkpoints)
         if verbose:
             print(full_cmd)
@@ -196,7 +205,7 @@ class SSHDocker(DockerMode):
         with tempfile.NamedTemporaryFile('w+', suffix='.sh') as ntf:
             for cmd in remote_cmds:
                 if verbose:
-                    ntf.write('echo "%s$ %s"\n' % (self.credentials.user_host, cmd)) 
+                    ntf.write('echo "%s$ %s"\n' % (self.credentials.user_host, cmd))
                 ntf.write(cmd+'\n')
             ntf.seek(0)
             ssh_cmd = self.credentials.get_ssh_script_cmd(ntf.name)
@@ -209,9 +218,10 @@ def dedent(s):
     return '\n'.join(lines)
 
 class EC2SpotDocker(DockerMode):
-    def __init__(self, 
+    def __init__(self,
             credentials,
             region='us-west-1',
+            s3_bucket_region='us-west-1',
             instance_type='m1.small',
             spot_price=0.0,
             s3_bucket=None,
@@ -220,11 +230,21 @@ class EC2SpotDocker(DockerMode):
             aws_key_name=None,
             iam_instance_profile_name='doodad',
             s3_log_prefix='experiment',
+            s3_log_name=None,
+            security_group_ids=None,
+            security_groups=None,
+            aws_s3_path=None,
+            extra_ec2_instance_kwargs=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
+        if security_group_ids is None:
+            security_group_ids = []
+        if security_groups is None:
+            security_groups = []
         self.credentials = credentials
         self.region = region
+        self.s3_bucket_region = s3_bucket_region
         self.spot_price = str(float(spot_price))
         self.instance_type = instance_type
         self.terminate = terminate
@@ -232,18 +252,23 @@ class EC2SpotDocker(DockerMode):
         self.image_id = image_id
         self.aws_key_name = aws_key_name
         self.s3_log_prefix = s3_log_prefix
+        self.s3_log_name = s3_log_name
+        self.security_group_ids = security_group_ids
+        self.security_groups = security_groups
         self.iam_instance_profile_name = iam_instance_profile_name
+        self.extra_ec2_instance_kwargs = extra_ec2_instance_kwargs
         self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
-        self.aws_s3_path = 's3://%s/doodad/logs' % self.s3_bucket
+        self.aws_s3_path = aws_s3_path or 's3://%s/doodad/logs' % self.s3_bucket
 
     def upload_file_to_s3(self, script_content, dry=False):
         f = tempfile.NamedTemporaryFile(delete=False)
         f.write(script_content.encode())
         f.close()
         remote_path = os.path.join(self.s3_mount_path, 'oversize_bash_scripts', str(uuid.uuid4()))
-        subprocess.check_call(["aws", "s3", "cp", f.name, remote_path])
+        subprocess.check_call(["aws", "s3", "cp", f.name, remote_path,
+                               '--region', self.s3_bucket_region])
         os.unlink(f.name)
         return remote_path
 
@@ -252,35 +277,37 @@ class EC2SpotDocker(DockerMode):
             remote_filename = os.path.basename(file_name)
         remote_path = 'doodad/mount/'+remote_filename
         if check_exist:
-            if s3_exists(bucket, remote_path):
+            if s3_exists(bucket, remote_path, region=self.s3_bucket_region):
                 print('\t%s exists! ' % os.path.join(bucket, remote_path))
                 return 's3://'+os.path.join(bucket, remote_path)
-        return s3_upload(file_name, bucket, remote_path, dry=dry)
+        return s3_upload(file_name, bucket, remote_path, dry=dry,
+                         region=self.s3_bucket_region)
 
     def make_timekey(self):
-        return '_%d'%(int(time.time()*1000))
+        return '%d'%(int(time.time()*1000))
 
     def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
-        #dry=True #DRY
-
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
             key_name=self.aws_key_name,
             spot_price=self.spot_price,
             iam_instance_profile_name=self.iam_instance_profile_name,
-            security_groups=[], #config.AWS_SECURITY_GROUPS,
-            security_group_ids=[], #config.AWS_SECURITY_GROUP_IDS,
-            network_interfaces=[], #config.AWS_NETWORK_INTERFACES,
+            security_groups=self.security_groups,
+            security_group_ids=self.security_group_ids,
+            network_interfaces=[],
         )
         aws_config = dict(default_config)
-        exp_name = 'run'+self.make_timekey()
+        if self.s3_log_name is None:
+            exp_name = "{}-{}".format(self.s3_log_prefix, self.make_timekey())
+        else:
+            exp_name = self.s3_log_name
         exp_prefix = self.s3_log_prefix
-        remote_log_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
-        log_dir = "/tmp/expt/local/" + exp_prefix.replace("_", "-") + "/" + exp_name
+        s3_base_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
+        sio.write("truncate -s 0 /home/ubuntu/user_data.log\n")
         sio.write("{\n")
         sio.write('die() { status=$1; shift; echo "FATAL: $*"; exit $status; }\n')
         sio.write('EC2_INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"\n')
@@ -292,7 +319,7 @@ class EC2SpotDocker(DockerMode):
         """.format(exp_prefix=exp_prefix, aws_region=self.region))
         sio.write("service docker start\n")
         sio.write("docker --config /home/ubuntu/.docker pull {docker_image}\n".format(docker_image=self.docker_image))
-        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.region))
+        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.s3_bucket_region))
         sio.write("""
             curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
             unzip awscli-bundle.zip
@@ -301,70 +328,143 @@ class EC2SpotDocker(DockerMode):
 
         mnt_args = ''
         py_path = []
-        output_mounts = []
+        local_output_dir_and_s3_path = []
+        max_sync_interval = 0
         for mount in mount_points:
             print('Handling mount: ', mount)
             if isinstance(mount, MountLocal):  # TODO: these should be mount_s3 objects
                 if mount.read_only:
-                    with mount.gzip() as gzip_file:
-                        gzip_path = os.path.realpath(gzip_file)
-                        file_hash = hash_file(gzip_path)
-                        s3_path = self.s3_upload(gzip_path, self.s3_bucket, remote_filename=file_hash+'.tar')
-                        remote_tar_name = '/tmp/'+file_hash+'.tar'
-                        remote_unpack_name = '/tmp/'+file_hash
+                    if mount.path_on_remote is None:
+                        with mount.gzip() as gzip_file:
+                            gzip_path = os.path.realpath(gzip_file)
+                            file_hash = hash_file(gzip_path)
+                            s3_path = self.s3_upload(gzip_path, self.s3_bucket, remote_filename=file_hash+'.tar')
+                        mount.path_on_remote = s3_path
+                        mount.local_file_hash = gzip_path
+                    else:
+                        file_hash = mount.local_file_hash
+                        s3_path = mount.path_on_remote
+                    remote_tar_name = '/tmp/'+file_hash+'.tar'
+                    remote_unpack_name = '/tmp/'+file_hash
                     sio.write("aws s3 cp {s3_path} {remote_tar_name}\n".format(s3_path=s3_path, remote_tar_name=remote_tar_name))
                     sio.write("mkdir -p {local_code_path}\n".format(local_code_path=remote_unpack_name))
                     sio.write("tar -xvf {remote_tar_name} -C {local_code_path}\n".format(
-                        local_code_path=remote_unpack_name, 
+                        local_code_path=remote_unpack_name,
                         remote_tar_name=remote_tar_name))
                     mount_point =  os.path.join('/mounts', mount.mount_point.replace('~/',''))
-                    mnt_args += ' -v %s:%s' % (os.path.join(remote_unpack_name, os.path.basename(mount.local_dir)), mount_point) 
+                    mnt_args += ' -v %s:%s' % (os.path.join(remote_unpack_name, os.path.basename(mount.local_dir)), mount_point)
                     if mount.pythonpath:
                         py_path.append(mount_point)
                 else:
                     raise ValueError()
             elif isinstance(mount, MountS3):
-                remote_dir = mount.mount_point
-                s3_path = os.path.join(remote_log_dir, mount.s3_path)
-                sio.write("mkdir -p {remote_dir}\n".format(remote_dir=remote_dir))
-                mnt_args += ' -v %s:%s' % (remote_dir, mount.mount_point)
+                # In theory the ec2_local_dir could be some random directory,
+                # but we make it the same as the mount directory for
+                # convenience.
+                #
+                # ec2_local_dir: directory visible to ec2 spot instance
+                # moint_point: directory visible to docker running inside ec2
+                #               spot instance
+                ec2_local_dir = mount.mount_point
+                s3_path = os.path.join(s3_base_dir, mount.s3_path)
+                if not mount.output:
+                    raise NotImplementedError()
+                local_output_dir_and_s3_path.append(
+                    (ec2_local_dir, s3_path)
+                )
+                sio.write("mkdir -p {remote_dir}\n".format(
+                    remote_dir=ec2_local_dir)
+                )
+                mnt_args += ' -v %s:%s' % (ec2_local_dir, mount.mount_point)
 
                 # Sync interval
                 sio.write("""
                 while /bin/true; do
                     aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
                     sleep {periodic_sync_interval}
-                done & echo sync initiated""".format(include_string=mount.include_string, log_dir=remote_dir, s3_path=s3_path,
-                                                     periodic_sync_interval=mount.sync_interval))
-                # Sync on terminate
+                done & echo sync initiated
+                """.format(
+                    include_string=mount.include_string,
+                    log_dir=ec2_local_dir,
+                    s3_path=s3_path,
+                    periodic_sync_interval=mount.sync_interval
+                ))
+                max_sync_interval = max(max_sync_interval, mount.sync_interval)
+
+                # Sync on terminate. This catches the case where the spot
+                # instance gets terminated before the user script ends.
+                #
+                # This is hoping that there's at least 3 seconds between when
+                # the spot instance gets marked for  termination and when it
+                # actually terminates.
                 sio.write("""
                     while /bin/true; do
                         if [ -z $(curl -Is http://169.254.169.254/latest/meta-data/spot/termination-time | head -1 | grep 404 | cut -d \  -f 2) ]
-                          then
+                        then
                             logger "Running shutdown hook."
                             aws s3 cp --recursive {log_dir} {s3_path}
                             break
-                          else
+                        else
                             # Spot instance not yet marked for termination.
-                            sleep 5
+                            # This is hoping that there's at least 3 seconds
+                            # between when the spot instance gets marked for
+                            # termination and when it actually terminates.
+                            sleep 3
                         fi
                     done & echo log sync initiated
-                """.format(log_dir=remote_dir, s3_path=s3_path))
+                """.format(
+                    log_dir=ec2_local_dir,
+                    s3_path=s3_path,
+                ))
             else:
                 raise NotImplementedError()
 
 
         sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}\n".format(
             exp_name=exp_name, aws_region=self.region))
-        sio.write("mkdir -p {log_dir}\n".format(log_dir=log_dir))
+
+        if self.gpu:
+            #sio.write('echo "LSMOD NVIDIA:"\n')
+            #sio.write("lsmod | grep nvidia\n")
+            #sio.write("echo 'Waiting for dpkg lock...'\n")
+            # wait for lock
+            #sio.write("""
+            #    while sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
+            #       sleep 1
+            #    done
+            #""")
+            #sio.write("sudo apt-get install nvidia-modprobe\n")
+            #sio.write("wget -P /tmp https://github.com/NVIDIA/nvidia-docker/releases/download/v1.0.1/nvidia-docker_1.0.1-1_amd64.deb\n")
+            #sio.write("sudo dpkg -i /tmp/nvidia-docker*.deb && rm /tmp/nvidia-docker*.deb\n")
+            sio.write("""
+                for i in {1..800}; do su -c "nvidia-modprobe -u -c=0" ubuntu && break || sleep 3; done
+                systemctl start nvidia-docker
+            """)
+            sio.write("echo 'Testing nvidia-smi'\n")
+            sio.write("nvidia-smi\n")
+            sio.write("echo 'Testing nvidia-smi inside docker'\n")
+            sio.write("nvidia-docker run --rm {docker_image} nvidia-smi\n".format(docker_image=self.docker_image))
+
         if self.checkpoint and self.checkpoint.restore:
             raise NotImplementedError()
         else:
             docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
         sio.write(docker_cmd+'\n')
 
-        sio.write("aws s3 cp --recursive {log_dir} {remote_log_dir}\n".format(log_dir=log_dir, remote_log_dir=remote_log_dir))
-        sio.write("aws s3 cp /home/ubuntu/user_data.log {remote_log_dir}/stdout.log\n".format(remote_log_dir=remote_log_dir))
+        # Sync all output mounts to s3 after running the user script
+        # Ideally the earlier while loop would be sufficient, but it might be
+        # the case that the earlier while loop isn't fast enough to catch a
+        # termination. So, we explicitly sync on termination.
+        for (local_output_dir, s3_dir_path) in local_output_dir_and_s3_path:
+            sio.write("aws s3 cp --recursive {local_dir} {s3_dir}\n".format(
+                local_dir=local_output_dir,
+                s3_dir=s3_dir_path
+            ))
+        sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_base_dir))
+
+        # Wait for last sync
+        if max_sync_interval > 0:
+            sio.write("sleep {}\n".format(max_sync_interval + 5))
 
         if self.terminate:
             sio.write("""
@@ -391,15 +491,15 @@ class EC2SpotDocker(DockerMode):
             aws s3 cp {s3_path} /home/ubuntu/remote_script.sh --region {aws_region} && \\
             chmod +x /home/ubuntu/remote_script.sh && \\
             bash /home/ubuntu/remote_script.sh
-            """.format(s3_path=s3_path, aws_region=self.region))
+            """.format(s3_path=s3_path, aws_region=self.s3_bucket_region))
             user_data = dedent(sio.getvalue())
         else:
             user_data = full_script
 
         if verbose:
             print(full_script)
-        #with open("/tmp/full_script", "w") as f:
-        #    f.write(full_script)
+            with open("/tmp/full_ec2_script", "w") as f:
+                f.write(full_script)
 
         instance_args = dict(
             ImageId=aws_config["image_id"],
@@ -415,6 +515,8 @@ class EC2SpotDocker(DockerMode):
             ),
             #**config.AWS_EXTRA_CONFIGS,
         )
+        if self.extra_ec2_instance_kwargs is not None:
+            instance_args.update(self.extra_ec2_instance_kwargs)
 
         if verbose:
             print("************************************************************")
@@ -454,18 +556,25 @@ class EC2SpotDocker(DockerMode):
 
 
 class EC2AutoconfigDocker(EC2SpotDocker):
-    def __init__(self, 
+    def __init__(self,
             region='us-west-1',
+            s3_bucket=None,
+            image_id=None,
+            aws_key_name=None,
+            iam_profile=None,
             **kwargs
             ):
         # find config file
         from doodad.ec2.autoconfig import AUTOCONFIG
         from doodad.ec2.credentials import AWSCredentials
-        s3_bucket = AUTOCONFIG.s3_bucket()
-        image_id = AUTOCONFIG.aws_image_id(region)
-        aws_key_name= AUTOCONFIG.aws_key_name(region)
-        iam_profile= AUTOCONFIG.iam_profile_name()
+        s3_bucket = AUTOCONFIG.s3_bucket() if s3_bucket is None else s3_bucket
+        image_id = AUTOCONFIG.aws_image_id(region) if image_id is None else image_id
+        aws_key_name= AUTOCONFIG.aws_key_name(region) if aws_key_name is None else aws_key_name
+        iam_profile= AUTOCONFIG.iam_profile_name() if iam_profile is None else iam_profile
         credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
+        security_group_ids = AUTOCONFIG.aws_security_group_ids()[region]
+        security_groups = AUTOCONFIG.aws_security_groups()
+
         super(EC2AutoconfigDocker, self).__init__(
                 s3_bucket=s3_bucket,
                 image_id=image_id,
@@ -473,7 +582,9 @@ class EC2AutoconfigDocker(EC2SpotDocker):
                 iam_instance_profile_name=iam_profile,
                 credentials=credentials,
                 region=region,
-                **kwargs 
+                security_groups=security_groups,
+                security_group_ids=security_group_ids,
+                **kwargs
                 )
 
 

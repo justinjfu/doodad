@@ -4,7 +4,8 @@ import argparse
 import os
 
 ARGS_DATA = 'DOODAD_ARGS_DATA'
-USE_CLOUDPICKLE = 'DOODAD_USE_CLOUDPICLE'
+USE_CLOUDPICKLE = 'DOODAD_USE_CLOUDPICKLE'
+CLOUDPICKLE_VERSION = 'DOODAD_CLOUDPICKLE_VERSION'
 
 
 __ARGS = None
@@ -22,11 +23,13 @@ def __get_arg_config():
     __ARGS = args
     """
     args_data = os.environ.get(ARGS_DATA, {})
-    use_cloudpickle = os.environ.get(USE_CLOUDPICKLE, False)
+    cloudpickle_version = os.environ.get(CLOUDPICKLE_VERSION, 'n/a')
+    use_cloudpickle = bool(int(os.environ.get(USE_CLOUDPICKLE, '0')))
 
     args = lambda : None # hack - use function as namespace
     args.args_data = args_data
     args.use_cloudpickle = use_cloudpickle
+    args.cloudpickle_version = cloudpickle_version
     return args
 
 
@@ -36,6 +39,7 @@ def get_args(key=None, default=None):
     if args.args_data:
         if args.use_cloudpickle:
             import cloudpickle
+            assert args.cloudpickle_version == cloudpickle.__version__, "Cloudpickle versions do not match! (host) %s vs (remote) %s" % (args.cloudpickle_version, cloudpickle.__version__)
             data = cloudpickle.loads(base64.b64decode(args.args_data))
         else:
             data = pickle.loads(base64.b64decode(args.args_data))
@@ -54,7 +58,9 @@ def encode_args(call_args, cloudpickle=False):
 
     if cloudpickle:
         import cloudpickle
+        cpickle_version = cloudpickle.__version__
         data = base64.b64encode(cloudpickle.dumps(call_args)).decode("utf-8")
     else:
         data = base64.b64encode(pickle.dumps(call_args)).decode("utf-8")
-    return data
+        cpickle_version = 'n/a'
+    return data, cpickle_version
