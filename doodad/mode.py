@@ -69,10 +69,13 @@ LOCAL = Local()
 
 
 class DockerMode(LaunchMode):
-    def __init__(self, image='ubuntu:16.04', visible_gpu_devices=[]):
+    def __init__(self, image='ubuntu:16.04', gpu=False, visible_gpu_devices=[]):
         super(DockerMode, self).__init__()
         self.docker_image = image
         self.docker_name = uuid.uuid4()
+
+        assert not self.gpu or len(self.visible_gpu_devices) > 0
+        self.gpu = gpu
         self.visible_gpu_devices = visible_gpu_devices
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
@@ -82,7 +85,7 @@ class DockerMode(LaunchMode):
             cmd_list.extend(pre_cmd)
 
         if verbose:
-            if len(self.visible_gpu_devices) != 0:
+            if self.gpu and len(self.visible_gpu_devices) > 0:
                 cmd_list.append('echo \"Running in docker (gpu)\"')
             else:
                 cmd_list.append('echo \"Running in docker\"')
@@ -113,7 +116,7 @@ class DockerMode(LaunchMode):
             docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
         else:
             docker_prefix = 'docker run %s %s /bin/bash -c ' % (extra_args, self.docker_image)
-        if len(self.visible_gpu_devices) != 0:
+        if self.gpu and len(self.visible_gpu_devices) > 0:
             docker_prefix = 'nvidia-'+docker_prefix
             docker_prefix = 'NV_GPU=\'%s\' ' % ','.join(map(str, self.visible_gpu_devices)) + docker_prefix
 
@@ -422,7 +425,7 @@ class EC2SpotDocker(DockerMode):
         sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}\n".format(
             exp_name=exp_name, aws_region=self.region))
 
-        if len(self.visible_gpu_devices) != 0:
+        if self.gpu and len(self.visible_gpu_devices) > 0:
             #sio.write('echo "LSMOD NVIDIA:"\n')
             #sio.write("lsmod | grep nvidia\n")
             #sio.write("echo 'Waiting for dpkg lock...'\n")
