@@ -658,8 +658,27 @@ class LocalSingularity(SingularityMode):
 
 
 class SlurmSingularity(LocalSingularity):
+    # TODO: set up an auto-config
+    def __init__(
+        self, image, account_name, partition, time_in_mins,
+        qos=None,
+        nodes=1,
+        n_tasks=1,
+        n_gpus=1,
+        **kwargs
+    ):
+        super(SlurmSingularity, self).__init__(image, **kwargs)
+        self.account_name = account_name
+        self.partition = partition
+        self.time_in_mins = time_in_mins
+        self.nodes = nodes
+        self.n_tasks = n_tasks
+        self.n_gpus = n_gpus
+
     def launch_command(self, cmd, mount_points=None, dry=False,
                        verbose=False, pre_cmd=None, post_cmd=None):
+        if pre_cmd is None:
+            pre_cmd = []
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
@@ -675,9 +694,28 @@ class SlurmSingularity(LocalSingularity):
             post_cmd=post_cmd,
             verbose=verbose,
         )
-        full_cmd = "sbatch -A fc_rail -p savio2_htc -t 5 {}".format(
-            singularity_cmd
-        )
+        if self.gpu:
+            full_cmd = (
+                "sbatch -A {account_name} -p {partition} -t {time}"
+                " -N {nodes} -n {n_tasks} --cpus-per-task={cpus_per_task}"
+                " --gres=gpu:{n_gpus} {cmd}".format(
+                    account_name=self.account_name,
+                    partition=self.partition,
+                    time=self.time_in_mins,
+                    nodes=self.nodes,
+                    n_tasks=self.n_tasks,
+                    cpus_per_task=2*self.n_gpus,
+                    n_gpus=self.n_gpus,
+                    cmd=singularity_cmd,
+                )
+            )
+        else:
+            full_cmd = "sbatch -A {account_name} -p {partition} -t {time} {cmd}".format(
+                account_name=self.account_name,
+                partition=self.partition,
+                time=self.time_in_mins,
+                cmd=singularity_cmd,
+            )
         if verbose:
             print(full_cmd)
         call_and_wait(full_cmd, dry=dry)
