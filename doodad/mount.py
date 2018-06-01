@@ -77,7 +77,7 @@ class MountLocal(Mount):
     def __str__(self):
         return 'MountLocal@%s'%self.local_dir
 
-    def docker_mount_dir(self):
+    def mount_dir(self):
          return os.path.join('/mounts', self.mount_point.replace('~/',''))
 
 

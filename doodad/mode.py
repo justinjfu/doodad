@@ -5,21 +5,19 @@ import uuid
 import time
 import base64
 
-from doodad.ec2.autoconfig import AUTOCONFIG
-
 try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
 
-from .mount import *
+from .mount import MountLocal, MountS3
 from .utils import hash_file, call_and_wait, CommandBuilder
 from .ec2.aws_util import s3_upload, s3_exists
+
 
 class LaunchMode(object):
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         raise NotImplementedError()
-
 
 
 class Local(LaunchMode):
@@ -131,7 +129,7 @@ class LocalDocker(DockerMode):
         for mount in mount_points:
             if isinstance(mount, MountLocal):
                 #mount_pnt = os.path.expanduser(mount.mount_point)
-                mount_pnt = mount.docker_mount_dir()
+                mount_pnt = mount.mount_dir()
                 mnt_args += ' -v %s:%s' % (mount.local_dir, mount_pnt)
                 call_and_wait('mkdir -p %s' % mount.local_dir)
                 if mount.pythonpath:
@@ -181,7 +179,7 @@ class SSHDocker(DockerMode):
                     remote_cmds.append('mkdir -p %s' % remote_mnt_dir)
                     unzip_cmd = 'tar -xf %s -C %s' % (remote_tar, remote_mnt_dir)
                     remote_cmds.append(unzip_cmd)
-                    mount_point = mount.docker_mount_dir()
+                    mount_point = mount.mount_dir()
                     mnt_args += ' -v %s:%s' % (os.path.join(remote_mnt_dir, os.path.basename(mount.mount_point)) ,mount_point)
                 else:
                     #remote_cmds.append('mkdir -p %s' % mount.mount_point)
@@ -593,3 +591,97 @@ class CodalabDocker(DockerMode):
         super(CodalabDocker, self).__init__()
         raise NotImplementedError()
 
+
+class SingularityMode(LaunchMode):
+    def __init__(self, image, gpu=False):
+        super(SingularityMode, self).__init__()
+        self.singularity_image = image
+        self.gpu = gpu
+
+    def get_singularity_cmd(
+            self,
+            main_cmd,
+            extra_args='',
+            verbose=True,
+            pythonpath=None,
+            pre_cmd=None,
+            post_cmd=None,
+        ):
+        cmd_list= CommandBuilder()
+        if pre_cmd:
+            cmd_list.extend(pre_cmd)
+
+        if verbose:
+            if self.gpu:
+                cmd_list.append('echo \"Running in singularity (gpu)\"')
+            else:
+                cmd_list.append('echo \"Running in singularity\"')
+        if pythonpath:
+            cmd_list.append('export PYTHONPATH=$PYTHONPATH:%s' % (':'.join(pythonpath)))
+
+        cmd_list.append('export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/vitchyr/.mujoco/mjpro150/bin')
+        cmd_list.append(main_cmd)
+        if post_cmd:
+            cmd_list.extend(post_cmd)
+
+        if self.gpu:
+            extra_args += ' --nv '
+        singularity_prefix = 'singularity exec %s %s /bin/bash -c ' % (
+                extra_args,
+                self.singularity_image,
+        )
+        main_cmd = cmd_list.to_string()
+        full_cmd = singularity_prefix + ("\'%s\'" % main_cmd)
+        return full_cmd
+
+
+class LocalSingularity(SingularityMode):
+    def get_mount_info(self, mount_points):
+        mnt_args = ''
+        py_path = []
+        for mount in mount_points:
+            if isinstance(mount, MountLocal):
+                mount_pnt = mount.mount_dir()
+                mnt_args += ' -B %s:%s' % (mount.local_dir, mount_pnt)
+                call_and_wait('mkdir -p %s' % mount.local_dir)
+                if mount.pythonpath:
+                    py_path.append(mount_pnt)
+            else:
+                raise NotImplementedError(type(mount))
+        return mnt_args, py_path
+
+
+    def launch_command(self, cmd, mount_points=None, dry=False,
+                       verbose=False, pre_cmd=None, post_cmd=None):
+        mnt_args, py_path = self.get_mount_info(mount_points)
+        full_cmd = self.get_singularity_cmd(
+            cmd,
+            extra_args=mnt_args,
+            pythonpath=py_path,
+            pre_cmd=pre_cmd,
+            post_cmd=post_cmd,
+            verbose=verbose,
+        )
+        if verbose:
+            print(full_cmd)
+        call_and_wait(full_cmd, dry=dry)
+
+
+class SlurmSingularity(LocalSingularity):
+    def launch_command(self, cmd, mount_points=None, dry=False,
+                       verbose=False, pre_cmd=None, post_cmd=None):
+        mnt_args, py_path = self.get_mount_info(mount_points)
+        singularity_cmd = self.get_singularity_cmd(
+            cmd,
+            extra_args=mnt_args,
+            pythonpath=py_path,
+            pre_cmd=pre_cmd,
+            post_cmd=post_cmd,
+            verbose=verbose,
+        )
+        full_cmd = "sbatch -A fc_rail -p savio -t 5 {}".format(
+            singularity_cmd
+        )
+        if verbose:
+            print(full_cmd)
+        call_and_wait(full_cmd, dry=dry)
