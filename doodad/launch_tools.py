@@ -26,6 +26,7 @@ def launch_python(
         target_mount_dir='target',
         use_cloudpickle=False,
         target_mount=None,
+        launch_locally=None,
         **launch_command_kwargs
 ):
     """
@@ -47,6 +48,8 @@ def launch_python(
         args = {}
     if mount_points is None:
         mount_points = []
+    if launch_locally is None:
+        launch_locally = isinstance(mode, Local)
 
     if target_mount is None:
         # mount
@@ -54,7 +57,7 @@ def launch_python(
         if not target_mount_dir:
             target_mount_dir = target_dir
         target_mount_dir = os.path.join(target_mount_dir, os.path.basename(target_dir))
-        if isinstance(mode, Local):
+        if launch_locally:
             target_mount = MountLocal(local_dir=target_dir)
         else:
             target_mount = MountLocal(local_dir=target_dir, mount_point=target_mount_dir)

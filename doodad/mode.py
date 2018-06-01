@@ -636,27 +636,18 @@ class SingularityMode(LaunchMode):
 
 
 class LocalSingularity(SingularityMode):
-    def get_mount_info(self, mount_points):
-        mnt_args = ''
+    def launch_command(self, cmd, mount_points=None, dry=False,
+                       verbose=False, pre_cmd=None, post_cmd=None):
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
-                mount_pnt = mount.mount_dir()
-                mnt_args += ' -B %s:%s' % (mount.local_dir, mount_pnt)
-                call_and_wait('mkdir -p %s' % mount.local_dir)
                 if mount.pythonpath:
-                    py_path.append(mount_pnt)
+                    py_path.append(mount.local_dir)
             else:
                 raise NotImplementedError(type(mount))
-        return mnt_args, py_path
 
-
-    def launch_command(self, cmd, mount_points=None, dry=False,
-                       verbose=False, pre_cmd=None, post_cmd=None):
-        mnt_args, py_path = self.get_mount_info(mount_points)
         full_cmd = self.get_singularity_cmd(
             cmd,
-            extra_args=mnt_args,
             pythonpath=py_path,
             pre_cmd=pre_cmd,
             post_cmd=post_cmd,
@@ -670,16 +661,22 @@ class LocalSingularity(SingularityMode):
 class SlurmSingularity(LocalSingularity):
     def launch_command(self, cmd, mount_points=None, dry=False,
                        verbose=False, pre_cmd=None, post_cmd=None):
-        mnt_args, py_path = self.get_mount_info(mount_points)
+        py_path = []
+        for mount in mount_points:
+            if isinstance(mount, MountLocal):
+                if mount.pythonpath:
+                    py_path.append(mount.local_dir)
+            else:
+                raise NotImplementedError(type(mount))
+
         singularity_cmd = self.get_singularity_cmd(
             cmd,
-            extra_args=mnt_args,
             pythonpath=py_path,
             pre_cmd=pre_cmd,
             post_cmd=post_cmd,
             verbose=verbose,
         )
-        full_cmd = "sbatch -A fc_rail -p savio -t 5 {}".format(
+        full_cmd = "sbatch -A fc_rail -p savio2_htc -t 5 {}".format(
             singularity_cmd
         )
         if verbose:
