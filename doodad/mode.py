@@ -619,7 +619,6 @@ class SingularityMode(LaunchMode):
         if pythonpath:
             cmd_list.append('export PYTHONPATH=$PYTHONPATH:%s' % (':'.join(pythonpath)))
 
-        cmd_list.append('export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/vitchyr/.mujoco/mjpro150/bin')
         cmd_list.append(main_cmd)
         if post_cmd:
             cmd_list.extend(post_cmd)
