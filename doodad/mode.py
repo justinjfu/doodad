@@ -301,14 +301,6 @@ class EC2SpotDocker(DockerMode):
         else:
             exp_name = self.s3_log_name
         exp_prefix = self.s3_log_prefix
-        # Assume that the subdirectories are handled by having a subdirectory structure
-        # on the instance itself rather than copying to a subdirectory in s3.
-        # So instead of
-        # s3 sync OUTPUT_DIR_FOR_DOODAD_TARGET AWS_S3_PATH/exp-prefix/exp-name
-        # we now do
-        # s3 sync OUTPUT_DIR_FOR_DOODAD_TARGET AWS_S3_PATH/exp-prefix
-        # where OUTPUT_DIR_FOR_DOODAD_TARGET/exp-name[0..n] exist on the instance
-        exp_name = ""
         s3_base_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
 
         sio = StringIO()
@@ -318,11 +310,12 @@ class EC2SpotDocker(DockerMode):
         sio.write('die() { status=$1; shift; echo "FATAL: $*"; exit $status; }\n')
         sio.write('EC2_INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"\n')
         sio.write("""
-            aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_prefix} --region {aws_region}
-        """.format(exp_prefix=exp_prefix, aws_region=self.region))
+            aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}
+        """.format(exp_name=exp_name, aws_region=self.region))
         sio.write("""
             aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=exp_prefix,Value={exp_prefix} --region {aws_region}
         """.format(exp_prefix=exp_prefix, aws_region=self.region))
+
         sio.write("service docker start\n")
         sio.write("docker --config /home/ubuntu/.docker pull {docker_image}\n".format(docker_image=self.docker_image))
         sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.s3_bucket_region))
@@ -425,9 +418,6 @@ class EC2SpotDocker(DockerMode):
             else:
                 raise NotImplementedError()
 
-
-        sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_prefix} --region {aws_region}\n".format(
-            exp_prefix=exp_prefix, aws_region=self.region))
 
         if self.gpu:
             #sio.write('echo "LSMOD NVIDIA:"\n')
