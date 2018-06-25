@@ -74,7 +74,7 @@ class DockerMode(LaunchMode):
         self.gpu = gpu
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
-            checkpoint=False, no_root=False):
+            checkpoint=False, no_root=False, use_docker_generated_name=False):
         cmd_list= CommandBuilder()
         if pre_cmd:
             cmd_list.extend(pre_cmd)
@@ -99,7 +99,7 @@ class DockerMode(LaunchMode):
             cmd_list.extend(post_cmd)
 
         docker_name = self.docker_name
-        if docker_name:
+        if docker_name and not use_docker_generated_name:
             extra_args += ' --name %s '%docker_name
 
         if checkpoint:
@@ -284,7 +284,7 @@ class EC2SpotDocker(DockerMode):
     def make_timekey(self):
         return '%d'%(int(time.time()*1000))
 
-    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
+    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False, num_exps=1):
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
@@ -301,6 +301,14 @@ class EC2SpotDocker(DockerMode):
         else:
             exp_name = self.s3_log_name
         exp_prefix = self.s3_log_prefix
+        # Assume that the subdirectories are handled by having a subdirectory structure
+        # on the instance itself rather than copying to a subdirectory in s3.
+        # So instead of
+        # s3 sync OUTPUT_DIR_FOR_DOODAD_TARGET AWS_S3_PATH/exp-prefix/exp-name
+        # we now do
+        # s3 sync OUTPUT_DIR_FOR_DOODAD_TARGET AWS_S3_PATH/exp-prefix
+        # where OUTPUT_DIR_FOR_DOODAD_TARGET/exp-name[0..n] exist on the instance
+        exp_name = ""
         s3_base_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
 
         sio = StringIO()
@@ -310,8 +318,8 @@ class EC2SpotDocker(DockerMode):
         sio.write('die() { status=$1; shift; echo "FATAL: $*"; exit $status; }\n')
         sio.write('EC2_INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"\n')
         sio.write("""
-            aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}
-        """.format(exp_name=exp_name, aws_region=self.region))
+            aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_prefix} --region {aws_region}
+        """.format(exp_prefix=exp_prefix, aws_region=self.region))
         sio.write("""
             aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=exp_prefix,Value={exp_prefix} --region {aws_region}
         """.format(exp_prefix=exp_prefix, aws_region=self.region))
@@ -418,8 +426,8 @@ class EC2SpotDocker(DockerMode):
                 raise NotImplementedError()
 
 
-        sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}\n".format(
-            exp_name=exp_name, aws_region=self.region))
+        sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_prefix} --region {aws_region}\n".format(
+            exp_prefix=exp_prefix, aws_region=self.region))
 
         if self.gpu:
             #sio.write('echo "LSMOD NVIDIA:"\n')
@@ -446,7 +454,10 @@ class EC2SpotDocker(DockerMode):
         if self.checkpoint and self.checkpoint.restore:
             raise NotImplementedError()
         else:
-            docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
+            docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path, use_docker_generated_name=True)
+        assert num_exps > 0
+        for _ in range(num_exps - 1):
+            sio.write(docker_cmd+' &\n')
         sio.write(docker_cmd+'\n')
 
         # Sync all output mounts to s3 after running the user script
