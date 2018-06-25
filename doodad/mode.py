@@ -74,7 +74,7 @@ class DockerMode(LaunchMode):
         self.gpu = gpu
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
-            checkpoint=False, no_root=False):
+            checkpoint=False, no_root=False, use_docker_generated_name=False):
         cmd_list= CommandBuilder()
         if pre_cmd:
             cmd_list.extend(pre_cmd)
@@ -99,7 +99,7 @@ class DockerMode(LaunchMode):
             cmd_list.extend(post_cmd)
 
         docker_name = self.docker_name
-        if docker_name:
+        if docker_name and not use_docker_generated_name:
             extra_args += ' --name %s '%docker_name
 
         if checkpoint:
@@ -284,7 +284,7 @@ class EC2SpotDocker(DockerMode):
     def make_timekey(self):
         return '%d'%(int(time.time()*1000))
 
-    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
+    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False, num_exps=1):
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
@@ -446,7 +446,10 @@ class EC2SpotDocker(DockerMode):
         if self.checkpoint and self.checkpoint.restore:
             raise NotImplementedError()
         else:
-            docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
+            docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path, use_docker_generated_name=True)
+        assert num_exps > 0
+        for _ in range(num_exps - 1):
+            sio.write(docker_cmd+' &\n')
         sio.write(docker_cmd+'\n')
 
         # Sync all output mounts to s3 after running the user script
@@ -498,7 +501,6 @@ class EC2SpotDocker(DockerMode):
             print(full_script)
             with open("/tmp/full_ec2_script", "w") as f:
                 f.write(full_script)
-
         instance_args = dict(
             ImageId=aws_config["image_id"],
             KeyName=aws_config["key_name"],
