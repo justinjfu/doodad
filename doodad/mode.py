@@ -460,9 +460,14 @@ class EC2SpotDocker(DockerMode):
                 s3_dir=s3_dir_path
             ))
         if num_exps == 1:
-            sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_base_dir))
+            sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_path}\n".format(
+                s3_path=os.path.join(s3_base_dir, 'stdout.log'),
+            ))
         else:
-            sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout_$EC2_INSTANCE_ID.log\n".format(s3_dir_path=s3_base_dir))
+            sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_path}\n".format(
+                s3_path=os.path.join(s3_base_dir,
+                                     'stdout_$EC2_INSTANCE_ID.log'),
+            ))
 
         # Wait for last sync
         if max_sync_interval > 0:
