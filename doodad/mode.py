@@ -284,7 +284,7 @@ class EC2SpotDocker(DockerMode):
     def make_timekey(self):
         return '%d'%(int(time.time()*1000))
 
-    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False, num_exps=1):
+    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False, num_exps=1, swap_size=4096):
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
@@ -315,6 +315,19 @@ class EC2SpotDocker(DockerMode):
         sio.write("""
             aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=exp_prefix,Value={exp_prefix} --region {aws_region}
         """.format(exp_prefix=exp_prefix, aws_region=self.region))
+
+        # Add swap file
+        if self.gpu:
+            swap_location = '/mnt/swapfile'
+        else:
+            swap_location = '/var/swap.1'
+        sio.write(
+            'sudo dd if=/dev/zero of={swap_location} bs=1M count={swap_size}\n'
+            .format(swap_location=swap_location, swap_size=swap_size))
+        sio.write('sudo mkswap {swap_location}\n'.format(swap_location=swap_location))
+        sio.write('sudo chmod 600 {swap_location}\n'.format(swap_location=swap_location))
+        sio.write('sudo swapon {swap_location}\n'.format(swap_location=swap_location))
+
 
         sio.write("service docker start\n")
         sio.write("docker --config /home/ubuntu/.docker pull {docker_image}\n".format(docker_image=self.docker_image))
