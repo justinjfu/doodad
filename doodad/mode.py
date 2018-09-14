@@ -26,7 +26,8 @@ class Local(LaunchMode):
         super(Local, self).__init__()
         self.env = {}
 
-    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
+    def launch_command(self, cmd, mount_points=None, dry=False,
+                       verbose=False, skip_wait=False):
         if dry:
             print(cmd); return
 
@@ -62,7 +63,7 @@ class Local(LaunchMode):
         commands.extend(cleanup_commands)
 
         # Call everything
-        commands.call_and_wait()
+        commands.call_and_wait(verbose=verbose, dry=dry, skip_wait=skip_wait)
 
 LOCAL = Local()
 
@@ -124,7 +125,8 @@ class LocalDocker(DockerMode):
         super(LocalDocker, self).__init__(**kwargs)
         self.checkpoints = checkpoints
 
-    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
+    def launch_command(self, cmd, mount_points=None, dry=False,
+                       verbose=False, skip_wait=False):
         mnt_args = ''
         py_path = []
         for mount in mount_points:
@@ -140,9 +142,7 @@ class LocalDocker(DockerMode):
 
         full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path,
                 checkpoint=self.checkpoints)
-        if verbose:
-            print(full_cmd)
-        call_and_wait(full_cmd, dry=dry)
+        call_and_wait(full_cmd, verbose=verbose, dry=dry, skip_wait=skip_wait)
 
 
 class SSHDocker(DockerMode):
@@ -659,7 +659,8 @@ class SingularityMode(LaunchMode):
 
 class LocalSingularity(SingularityMode):
     def launch_command(self, cmd, mount_points=None, dry=False,
-                       verbose=False, pre_cmd=None, post_cmd=None):
+                       verbose=False, pre_cmd=None, post_cmd=None,
+                       skip_wait=False):
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
@@ -675,9 +676,7 @@ class LocalSingularity(SingularityMode):
             post_cmd=post_cmd,
             verbose=verbose,
         )
-        if verbose:
-            print(full_cmd)
-        call_and_wait(full_cmd, dry=dry)
+        call_and_wait(full_cmd, verbose=verbose, dry=dry, skip_wait=skip_wait)
 
 
 class SlurmSingularity(LocalSingularity):
