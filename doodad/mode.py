@@ -68,20 +68,23 @@ LOCAL = Local()
 
 
 class DockerMode(LaunchMode):
-    def __init__(self, image='ubuntu:16.04', gpu=False):
+    def __init__(self, image='ubuntu:16.04', gpu=False, visible_gpu_devices=[]):
         super(DockerMode, self).__init__()
         self.docker_image = image
         self.docker_name = uuid.uuid4()
+
+        assert not self.gpu or len(self.visible_gpu_devices) > 0
         self.gpu = gpu
+        self.visible_gpu_devices = visible_gpu_devices
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
-            checkpoint=False, no_root=False):
+            checkpoint=False, no_root=False, port=None):
         cmd_list= CommandBuilder()
         if pre_cmd:
             cmd_list.extend(pre_cmd)
 
         if verbose:
-            if self.gpu:
+            if self.gpu and len(self.visible_gpu_devices) > 0:
                 cmd_list.append('echo \"Running in docker (gpu)\"')
             else:
                 cmd_list.append('echo \"Running in docker\"')
@@ -112,8 +115,10 @@ class DockerMode(LaunchMode):
             docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
         else:
             docker_prefix = 'docker run %s %s /bin/bash -c ' % (extra_args, self.docker_image)
-        if self.gpu:
+        if self.gpu and len(self.visible_gpu_devices) > 0:
             docker_prefix = 'nvidia-'+docker_prefix
+            docker_prefix = 'NV_GPU=\'%s\' ' % ','.join(map(str, self.visible_gpu_devices)) + docker_prefix
+
         main_cmd = cmd_list.to_string()
         full_cmd = docker_prefix + ("\'%s\'" % main_cmd)
         return full_cmd
@@ -124,7 +129,7 @@ class LocalDocker(DockerMode):
         super(LocalDocker, self).__init__(**kwargs)
         self.checkpoints = checkpoints
 
-    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False, port=None, root=False, use_tty=True):
         mnt_args = ''
         py_path = []
         for mount in mount_points:
@@ -138,8 +143,11 @@ class LocalDocker(DockerMode):
             else:
                 raise NotImplementedError(type(mount))
 
-        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path,
-                checkpoint=self.checkpoints)
+        if port is not None:
+            mnt_args += ' -p %s:%s' % (port, port)
+
+        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path, use_tty=use_tty,
+                checkpoint=self.checkpoints, port=port, no_root=not(root))
         if verbose:
             print(full_cmd)
         call_and_wait(full_cmd, dry=dry)
@@ -220,7 +228,6 @@ class EC2SpotDocker(DockerMode):
     def __init__(self,
             credentials,
             region='us-west-1',
-            s3_bucket_region='us-west-1',
             instance_type='m1.small',
             spot_price=0.0,
             s3_bucket=None,
@@ -233,7 +240,6 @@ class EC2SpotDocker(DockerMode):
             security_group_ids=None,
             security_groups=None,
             aws_s3_path=None,
-            extra_ec2_instance_kwargs=None,
             **kwargs
             ):
         super(EC2SpotDocker, self).__init__(**kwargs)
@@ -243,7 +249,6 @@ class EC2SpotDocker(DockerMode):
             security_groups = []
         self.credentials = credentials
         self.region = region
-        self.s3_bucket_region = s3_bucket_region
         self.spot_price = str(float(spot_price))
         self.instance_type = instance_type
         self.terminate = terminate
@@ -255,7 +260,6 @@ class EC2SpotDocker(DockerMode):
         self.security_group_ids = security_group_ids
         self.security_groups = security_groups
         self.iam_instance_profile_name = iam_instance_profile_name
-        self.extra_ec2_instance_kwargs = extra_ec2_instance_kwargs
         self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
@@ -267,7 +271,7 @@ class EC2SpotDocker(DockerMode):
         f.close()
         remote_path = os.path.join(self.s3_mount_path, 'oversize_bash_scripts', str(uuid.uuid4()))
         subprocess.check_call(["aws", "s3", "cp", f.name, remote_path,
-                               '--region', self.s3_bucket_region])
+                               '--region', self.region])
         os.unlink(f.name)
         return remote_path
 
@@ -276,11 +280,10 @@ class EC2SpotDocker(DockerMode):
             remote_filename = os.path.basename(file_name)
         remote_path = 'doodad/mount/'+remote_filename
         if check_exist:
-            if s3_exists(bucket, remote_path, region=self.s3_bucket_region):
+            if s3_exists(bucket, remote_path, region=self.region):
                 print('\t%s exists! ' % os.path.join(bucket, remote_path))
                 return 's3://'+os.path.join(bucket, remote_path)
-        return s3_upload(file_name, bucket, remote_path, dry=dry,
-                         region=self.s3_bucket_region)
+        return s3_upload(file_name, bucket, remote_path, dry=dry, region=self.region)
 
     def make_timekey(self):
         return '%d'%(int(time.time()*1000))
@@ -306,7 +309,6 @@ class EC2SpotDocker(DockerMode):
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
-        sio.write("truncate -s 0 /home/ubuntu/user_data.log\n")
         sio.write("{\n")
         sio.write('die() { status=$1; shift; echo "FATAL: $*"; exit $status; }\n')
         sio.write('EC2_INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"\n')
@@ -318,7 +320,7 @@ class EC2SpotDocker(DockerMode):
         """.format(exp_prefix=exp_prefix, aws_region=self.region))
         sio.write("service docker start\n")
         sio.write("docker --config /home/ubuntu/.docker pull {docker_image}\n".format(docker_image=self.docker_image))
-        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.s3_bucket_region))
+        sio.write("export AWS_DEFAULT_REGION={aws_region}\n".format(aws_region=self.region))
         sio.write("""
             curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
             unzip awscli-bundle.zip
@@ -422,7 +424,7 @@ class EC2SpotDocker(DockerMode):
         sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}\n".format(
             exp_name=exp_name, aws_region=self.region))
 
-        if self.gpu:
+        if self.gpu and len(self.visible_gpu_devices) > 0:
             #sio.write('echo "LSMOD NVIDIA:"\n')
             #sio.write("lsmod | grep nvidia\n")
             #sio.write("echo 'Waiting for dpkg lock...'\n")
@@ -490,7 +492,7 @@ class EC2SpotDocker(DockerMode):
             aws s3 cp {s3_path} /home/ubuntu/remote_script.sh --region {aws_region} && \\
             chmod +x /home/ubuntu/remote_script.sh && \\
             bash /home/ubuntu/remote_script.sh
-            """.format(s3_path=s3_path, aws_region=self.s3_bucket_region))
+            """.format(s3_path=s3_path, aws_region=self.region))
             user_data = dedent(sio.getvalue())
         else:
             user_data = full_script
@@ -514,8 +516,6 @@ class EC2SpotDocker(DockerMode):
             ),
             #**config.AWS_EXTRA_CONFIGS,
         )
-        if self.extra_ec2_instance_kwargs is not None:
-            instance_args.update(self.extra_ec2_instance_kwargs)
 
         if verbose:
             print("************************************************************")
@@ -559,21 +559,18 @@ class EC2AutoconfigDocker(EC2SpotDocker):
             region='us-west-1',
             s3_bucket=None,
             image_id=None,
-            aws_key_name=None,
-            iam_profile=None,
             **kwargs
             ):
         # find config file
         from doodad.ec2.autoconfig import AUTOCONFIG
         from doodad.ec2.credentials import AWSCredentials
         s3_bucket = AUTOCONFIG.s3_bucket() if s3_bucket is None else s3_bucket
-        image_id = AUTOCONFIG.aws_image_id(region) if image_id is None else image_id
-        aws_key_name= AUTOCONFIG.aws_key_name(region) if aws_key_name is None else aws_key_name
-        iam_profile= AUTOCONFIG.iam_profile_name() if iam_profile is None else iam_profile
+        image_id = image_id or AUTOCONFIG.aws_image_id(region)
+        aws_key_name= AUTOCONFIG.aws_key_name(region)
+        iam_profile= AUTOCONFIG.iam_profile_name()
         credentials=AWSCredentials(aws_key=AUTOCONFIG.aws_access_key(), aws_secret=AUTOCONFIG.aws_access_secret())
-        security_group_ids = AUTOCONFIG.aws_security_group_ids()[region]
+        security_group_ids = [AUTOCONFIG.aws_security_group_ids()[region]]
         security_groups = AUTOCONFIG.aws_security_groups()
-
         super(EC2AutoconfigDocker, self).__init__(
                 s3_bucket=s3_bucket,
                 image_id=image_id,
@@ -581,8 +578,8 @@ class EC2AutoconfigDocker(EC2SpotDocker):
                 iam_instance_profile_name=iam_profile,
                 credentials=credentials,
                 region=region,
-                security_groups=security_groups,
-                security_group_ids=security_group_ids,
+                #security_groups=security_groups,
+                #security_group_ids=security_group_ids,
                 **kwargs
                 )
 
