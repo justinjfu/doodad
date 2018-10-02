@@ -1,20 +1,53 @@
-from doodad.dfile import tmp_cache_file
+import re
 
-def open_ssh_file(filepath, user, host, mode='r'):
-    return SSHFile(filepath, user, host, mode=mode)
+from doodad.dfile import tmp_cache_file
+from doodad.dfile import utils
+from doodad.credentials import ssh as ssh_credentials
+from doodad.utils import shell
+
+SSH_REGEX = r'ssh://(?P<user>[a-zA-Z0-9_\-]+)@(?P<hostname>([a-zA-Z0-9_\-\.])+):(?P<path>.*)'
+SSH_REGEX = re.compile(SSH_REGEX)
+
+def _parse_filename(filename):
+    ssh_match = SSH_REGEX.match(filename)
+    if ssh_match:
+        user = ssh_match.group('user')
+        host = ssh_match.group('hostname')
+        path = ssh_match.group('path')
+        return user, host, path
+    else:
+        raise ValueError("Invalid SSH format: %s" % filename)
 
 class SSHFile(tmp_cache_file.TmpCacheFile):
     def __init__(self, filename, user, host, mode):
-        super(SSHFile, self).__init__(mode=mode)
         self.filename = filename
         self.username = user
         self.hostname = host
+        self.credentials = ssh_credentials.get_credentials(host, user)
+        super(SSHFile, self).__init__(mode=mode)
 
     def on_load(self):
-        #TODO: read file from S3
-        raise NotImplementedError()
+        scp_cmd = self.credentials.get_scp_cmd(
+            self.filename,
+            self._tmp_file.name,
+            src_remote=True)
+        try:
+            shell.call(scp_cmd, dry=False, wait=True, shell=False)
+        except OSError:
+            raise OSError("SSHFile failed on SCP cmd: %s" % scp_cmd)
+        self._tmp_file.seek(0)
 
     def on_flush(self):
-        #TODO: write file to S3
-        raise NotImplementedError()
+        scp_cmd = self.credentials.get_scp_cmd(
+            self._tmp_file.name,
+            self.filename,
+            src_remote=False)
+        try:
+            shell.call(scp_cmd, dry=False, wait=True, shell=False)
+        except OSError:
+            raise OSError("SSHFile failed on SCP cmd: %s" % scp_cmd)
 
+
+def open(filepath, mode='r', credentials=None, **kwargs):
+    user, host, path = _parse_filename(filepath)
+    return SSHFile(path, user, host, mode=mode)

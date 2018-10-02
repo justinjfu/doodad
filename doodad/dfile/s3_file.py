@@ -2,7 +2,7 @@ from doodad.dfile import tmp_cache_file
 
 ALLOWED_MODES = {'r', 'r+', 'w', 'w+'}
 
-def open_s3_file(filename, mode='r'):
+def open(filename, mode='r', **kwargs):
     if mode not in ALLOWED_MODES:
         raise NotImplementedError('S3 file mode %s not implemented' % mode)
     return S3File(filename, mode=mode)
