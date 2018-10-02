@@ -37,7 +37,7 @@ def open(filename, mode='r', **kwargs):
 
 def mkdir(path, mode=0o777):
     """Create a directory named path with numeric mode mode."""
-    module = _get_module(filename)
+    module = _get_module(path)
     return module.mkdir(path, mode=mode)
 
 
@@ -46,7 +46,7 @@ def rmdir(path):
     Remove (delete) the directory path. Only works when the directory is empty, 
     otherwise, OSError is raised.
     """
-    module = _get_module(filename)
+    module = _get_module(path)
     return module.rmdir(path)
 
 
@@ -54,7 +54,7 @@ def makedirs(path, mode=0o777, exist_ok=False):
     """Recursive directory creation function. Like mkdir(), but makes all
     intermediate-level directories needed to contain the leaf directory.
     """
-    module = _get_module(filename)
+    module = _get_module(path)
     return module.makedirs(path, mode=mode, exist_ok=exist_ok)
 
 
@@ -64,7 +64,7 @@ def listdir(path='.'):
     The list is in arbitrary order, and does not include the special entries '.'
     and '..' even if they are present in the directory.
     """
-    module = _get_module(filename)
+    module = _get_module(path)
     return module.listdir(path)
 
 
@@ -73,23 +73,23 @@ def remove(path):
     Remove (delete) the file path. If path is a directory, OSError is raised. 
     Use rmdir() to remove directories.
     """
-    module = _get_module(filename)
+    module = _get_module(path)
     return module.remove(path)
 
 
 def exists(path):
     """Return True if path refers to an existing path."""
-    module = _get_module(filename, os_path=True)
+    module = _get_module(path, os_path=True)
     return module.exists(path)
 
 
 def isfile(path):
     """Return True if path is an existing regular file."""
-    module = _get_module(filename, os_path=True)
+    module = _get_module(path, os_path=True)
     return module.isfile(path)
 
 
 def isdir(path):
     """Return True if path is an existing directory."""
-    module = _get_module(filename, os_path=True)
+    module = _get_module(path, os_path=True)
     return module.isdir(path)

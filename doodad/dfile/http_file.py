@@ -1,4 +1,6 @@
-import urllib2
+"""
+"""
+import six
 
 def open(filename, mode='r', **kwargs):
     if mode != 'r':
@@ -8,7 +10,7 @@ def open(filename, mode='r', **kwargs):
 class HTTPFile(object):
     def __init__(self, filename, **kwargs):
         self._path = filename
-        self._fp = urllib2.urlopen(filename, **kwargs)
+        self._fp = six.moves.urllib.request.urlopen(filename, **kwargs)
 
     def __enter__(self):
         return self

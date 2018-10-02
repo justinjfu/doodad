@@ -21,3 +21,26 @@ class S3File(tmp_cache_file.TmpCacheFile):
         #TODO: write file to S3
         raise NotImplementedError()
 
+def mkdir(path, mode=0o777):
+    raise ValueError()
+
+def rmdir(path):
+    raise ValueError()
+
+def makedirs(path, mode=0o777, exist_ok=False):
+    raise ValueError()
+
+def listdir(path='.'):
+    raise ValueError() 
+
+def remove(path):
+    raise ValueError()
+
+def exists(path):
+    raise ValueError()
+
+def isfile(path):
+    raise ValueError()
+
+def isdir(path):
+    raise ValueError()

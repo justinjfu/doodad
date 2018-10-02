@@ -1,11 +1,6 @@
 import os
 
-def get_credentials(hostname, username):
-    """Get SSH credentials and try to automatically 
-    resolve the identity file via environment variable
-    """
-    id_file = os.environ.get('DOODAD_SSH_IDENTITY', None)
-    return SSHCredentials(hostname, username, identity_file=id_file)
+SSH_IDENTITY_FILE = None
 
 class SSHCredentials(object):
     """
@@ -64,3 +59,23 @@ class SSHCredentials(object):
     @property
     def user_host(self):
         return '%s@%s' % (self.username, self.hostname)
+
+
+def set_identity_file(id_file):
+    """Set the identity file to be used for SSH connections."""
+    global SSH_IDENTITY_FILE
+    SSH_IDENTITY_FILE = id_file
+
+
+def get_credentials(hostname, username):
+    """Get SSH credentials and try to automatically 
+    resolve the identity file via environment variable
+
+    Returns:
+        creds (SSHCredentials): A credentiasl object
+    """
+    if SSH_IDENTITY_FILE is not None:
+        id_file = SSH_IDENTITY_FILE
+    else:
+        id_file = os.environ.get('DOODAD_SSH_IDENTITY', None)
+    return SSHCredentials(hostname, username, identity_file=id_file)
