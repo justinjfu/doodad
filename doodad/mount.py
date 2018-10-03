@@ -88,6 +88,21 @@ class MountGitRepo(Mount):
         self.git_credentials = git_credentials
         raise NotImplementedError()
 
+class MountGCP(Mount):
+    def __init__(self, gcp_path, s3_bucket=None, sync_interval=15, output=False,
+            include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), **kwargs):
+        super(MountS3, self).__init__(**kwargs)
+        if s3_bucket is None:
+            # load from config
+            from doodad.ec2.autoconfig import AUTOCONFIG
+            s3_bucket = AUTOCONFIG.s3_bucket()
+        self.s3_bucket = s3_bucket
+        self.s3_path = s3_path
+        self.output = output
+        self.sync_interval = sync_interval
+        self.sync_on_terminate = True
+        self.include_types = include_types
+
 
 class MountS3(Mount):
     def __init__(self, s3_path, s3_bucket=None, sync_interval=15, output=False,
