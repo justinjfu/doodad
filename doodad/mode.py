@@ -1,4 +1,5 @@
 import os
+import stat
 import subprocess
 import tempfile
 import uuid
@@ -681,8 +682,8 @@ class SlurmSingularity(LocalSingularity):
         self.n_tasks = n_tasks
         self.n_gpus = n_gpus
 
-    def launch_command(self, cmd, mount_points=None, dry=False,
-                       verbose=False, pre_cmd=None, post_cmd=None):
+    def create_slurm_command(self, cmd, mount_points=None,
+                             verbose=False, pre_cmd=None, post_cmd=None):
         if pre_cmd is None:
             pre_cmd = []
         py_path = []
@@ -724,4 +725,32 @@ class SlurmSingularity(LocalSingularity):
             )
         if verbose:
             print(full_cmd)
+        return full_cmd
+
+    def launch_command(self, cmd, dry=False, **kwargs):
+        full_cmd = self.create_slurm_command(cmd, **kwargs)
         call_and_wait(full_cmd, dry=dry)
+
+
+class ScriptSlurmSingularity(SlurmSingularity):
+    """
+    Create or add to a script to run a bunch of slurm jobs.
+    """
+    TMP_FILE = '/tmp/script_to_scp_over.sh'
+
+    def launch_command(
+            self, cmd, first_launch_command=False,
+            dry=False, **kwargs
+    ):
+        full_cmd = self.create_slurm_command(cmd, **kwargs)
+        if first_launch_command:
+            with open(self.TMP_FILE, "w") as myfile:
+                myfile.write(full_cmd + '\n')
+            # make file executable
+            st = os.stat(self.TMP_FILE)
+            os.chmod(self.TMP_FILE, st.st_mode | stat.S_IEXEC)
+            print("Script generated! scp this script over:", self.TMP_FILE)
+        else:
+            with open(self.TMP_FILE, "a") as myfile:
+                myfile.write(full_cmd + '\n')
+            print("Script updated. scp this script over:", self.TMP_FILE)
