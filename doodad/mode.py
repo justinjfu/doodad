@@ -402,6 +402,7 @@ class EC2SpotDocker(DockerMode):
                         then
                             logger "Running shutdown hook."
                             aws s3 cp --recursive {log_dir} {s3_path}
+                            aws s3 cp /home/ubuntu/user_data.log {s3_path}
                             break
                         else
                             # Spot instance not yet marked for termination.
@@ -418,6 +419,16 @@ class EC2SpotDocker(DockerMode):
             else:
                 raise NotImplementedError()
 
+        stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout_$EC2_INSTANCE_ID.log')
+        sio.write("""
+        while /bin/true; do
+            aws s3 cp /home/ubuntu/user_data.log {s3_path}
+            sleep {periodic_sync_interval}
+        done & echo sync initiated
+        """.format(
+            s3_path=stdout_log_s3_path,
+            periodic_sync_interval=max_sync_interval
+        ))
 
         sio.write("aws ec2 create-tags --resources $EC2_INSTANCE_ID --tags Key=Name,Value={exp_name} --region {aws_region}\n".format(
             exp_name=exp_name, aws_region=self.region))
