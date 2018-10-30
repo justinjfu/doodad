@@ -387,8 +387,6 @@ class EC2SpotDocker(DockerMode):
                 #               spot instance
                 ec2_local_dir = mount.mount_point
                 s3_path = os.path.join(s3_base_dir, mount.s3_path)
-                if self.num_exps == 1:
-                    stdout_log_s3_path = os.path.join(s3_path, 'stdout_$EC2_INSTANCE_ID.log')
                 if not mount.output:
                     raise NotImplementedError()
                 local_output_dir_and_s3_path.append(
