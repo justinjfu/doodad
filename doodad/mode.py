@@ -449,7 +449,7 @@ class EC2SpotDocker(DockerMode):
             sleep {periodic_sync_interval}
         done & echo sync initiated
         """.format(
-            s3_path=stdout_log_s3_path,
+            stdout_log_s3_path=stdout_log_s3_path,
             periodic_sync_interval=max_sync_interval
         ))
 
