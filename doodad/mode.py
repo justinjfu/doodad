@@ -432,6 +432,18 @@ class EC2SpotDocker(DockerMode):
             else:
                 raise NotImplementedError()
 
+        stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout.log')
+        if num_exps > 1:
+            stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout_$EC2_INSTANCE_ID.log')
+        sio.write("""
+        while /bin/true; do
+            aws s3 cp /home/ubuntu/user_data.log {s3_path}
+            sleep {periodic_sync_interval}
+        done & echo sync initiated
+        """.format(
+            s3_path=stdout_log_s3_path,
+            periodic_sync_interval=max_sync_interval
+        ))
 
         if self.gpu:
             #sio.write('echo "LSMOD NVIDIA:"\n')
