@@ -748,6 +748,7 @@ class SlurmSingularity(LocalSingularity):
             )
         if verbose:
             print(full_cmd)
+        return full_cmd
 
     # def launch_command(self, cmd, dry=False, **kwargs):
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
