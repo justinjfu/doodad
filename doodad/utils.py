@@ -8,7 +8,7 @@ THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.dirname(THIS_FILE_DIR)
 EXAMPLES_DIR = os.path.join(REPO_DIR, 'examples')
 
-HASH_BUF_SIZE = 65536 
+HASH_BUF_SIZE = 65536
 
 def hash_file(filename):
     hasher = hashlib.md5()
@@ -21,11 +21,13 @@ def hash_file(filename):
     return hasher.hexdigest()
 
 
-def call_and_wait(cmd, verbose=False, dry=False):
+def call_and_wait(cmd, verbose=False, dry=False, skip_wait=False):
     if dry or verbose:
         print(cmd)
     if not dry:
         p = subprocess.Popen(cmd, shell=True)
+    if skip_wait:
+        return
     try:
         p.wait()
     except KeyboardInterrupt:
@@ -64,8 +66,13 @@ class CommandBuilder(object):
         for cmd in self.cmds:
             yield cmd
 
-    def call_and_wait(self, verbose=False, dry=False):
-        return call_and_wait(self.to_string())
+    def call_and_wait(self, verbose=False, dry=False, skip_wait=False):
+        return call_and_wait(
+            self.to_string(),
+            verbose=verbose,
+            dry=dry,
+            skip_wait=skip_wait,
+        )
 
     @contextlib.contextmanager
     def as_script(self, suffix='.sh'):
