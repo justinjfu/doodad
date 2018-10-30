@@ -439,9 +439,10 @@ class EC2SpotDocker(DockerMode):
             else:
                 raise NotImplementedError()
 
-        stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout.log')
         if self.num_exps > 1:
             stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout_$EC2_INSTANCE_ID.log')
+        else:
+            stdout_log_s3_path = os.path.join(s3_path, 'stdout.log')
         sio.write("""
         while /bin/true; do
             aws s3 cp /home/ubuntu/user_data.log {s3_path}
