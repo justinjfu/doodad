@@ -303,6 +303,7 @@ class EC2SpotDocker(DockerMode):
             exp_name = self.s3_log_name
         exp_prefix = self.s3_log_prefix
         s3_base_dir = os.path.join(self.aws_s3_path, exp_prefix.replace("_", "-"), exp_name)
+        stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout_$EC2_INSTANCE_ID.log')
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
@@ -366,6 +367,8 @@ class EC2SpotDocker(DockerMode):
                 #               spot instance
                 ec2_local_dir = mount.mount_point
                 s3_path = os.path.join(s3_base_dir, mount.s3_path)
+                if self.num_exps == 1:
+                    stdout_log_s3_path = os.path.join(s3_path, 'stdout_$EC2_INSTANCE_ID.log')
                 if not mount.output:
                     raise NotImplementedError()
                 local_output_dir_and_s3_path.append(
@@ -402,7 +405,7 @@ class EC2SpotDocker(DockerMode):
                         then
                             logger "Running shutdown hook."
                             aws s3 cp --recursive {log_dir} {s3_path}
-                            aws s3 cp /home/ubuntu/user_data.log {s3_path}
+                            aws s3 cp /home/ubuntu/user_data.log {stdout_log_s3_path}
                             break
                         else
                             # Spot instance not yet marked for termination.
@@ -415,17 +418,14 @@ class EC2SpotDocker(DockerMode):
                 """.format(
                     log_dir=ec2_local_dir,
                     s3_path=s3_path,
+                    stdout_log_s3_path=stdout_log_s3_path,
                 ))
             else:
                 raise NotImplementedError()
 
-        if self.num_exps > 1:
-            stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout_$EC2_INSTANCE_ID.log')
-        else:
-            stdout_log_s3_path = os.path.join(s3_path, 'stdout.log')
         sio.write("""
         while /bin/true; do
-            aws s3 cp /home/ubuntu/user_data.log {s3_path}
+            aws s3 cp /home/ubuntu/user_data.log {stdout_log_s3_path}
             sleep {periodic_sync_interval}
         done & echo sync initiated
         """.format(
@@ -473,7 +473,9 @@ class EC2SpotDocker(DockerMode):
                 local_dir=local_output_dir,
                 s3_dir=s3_dir_path
             ))
-        sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_dir_path}/stdout.log\n".format(s3_dir_path=s3_base_dir))
+        sio.write("aws s3 cp /home/ubuntu/user_data.log {}\n".format(
+            stdout_log_s3_path,
+        ))
 
         # Wait for last sync
         if max_sync_interval > 0:
