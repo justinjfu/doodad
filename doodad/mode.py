@@ -439,7 +439,7 @@ class EC2SpotDocker(DockerMode):
                 raise NotImplementedError()
 
         stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout.log')
-        if num_exps > 1:
+        if self.num_exps > 1:
             stdout_log_s3_path = os.path.join(s3_base_dir, 'stdout_$EC2_INSTANCE_ID.log')
         sio.write("""
         while /bin/true; do
