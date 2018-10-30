@@ -233,8 +233,10 @@ class EC2SpotDocker(DockerMode):
             security_groups=None,
             aws_s3_path=None,
             extra_ec2_instance_kwargs=None,
+            num_exps=1,
+            swap_size=4096,
             **kwargs
-            ):
+        ):
         super(EC2SpotDocker, self).__init__(**kwargs)
         if security_group_ids is None:
             security_group_ids = []
@@ -255,6 +257,8 @@ class EC2SpotDocker(DockerMode):
         self.security_groups = security_groups
         self.iam_instance_profile_name = iam_instance_profile_name
         self.extra_ec2_instance_kwargs = extra_ec2_instance_kwargs
+        self.num_exps = num_exps
+        self.swap_size = swap_size
         self.checkpoint = None
 
         self.s3_mount_path = 's3://%s/doodad/mount' % self.s3_bucket
@@ -284,7 +288,7 @@ class EC2SpotDocker(DockerMode):
     def make_timekey(self):
         return '%d'%(int(time.time()*1000))
 
-    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False, num_exps=1, swap_size=4096):
+    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
@@ -323,7 +327,7 @@ class EC2SpotDocker(DockerMode):
             swap_location = '/var/swap.1'
         sio.write(
             'sudo dd if=/dev/zero of={swap_location} bs=1M count={swap_size}\n'
-            .format(swap_location=swap_location, swap_size=swap_size))
+            .format(swap_location=swap_location, swap_size=self.swap_size))
         sio.write('sudo mkswap {swap_location}\n'.format(swap_location=swap_location))
         sio.write('sudo chmod 600 {swap_location}\n'.format(swap_location=swap_location))
         sio.write('sudo swapon {swap_location}\n'.format(swap_location=swap_location))
@@ -458,8 +462,8 @@ class EC2SpotDocker(DockerMode):
             raise NotImplementedError()
         else:
             docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path, use_docker_generated_name=True)
-        assert num_exps > 0
-        for _ in range(num_exps - 1):
+        assert self.num_exps > 0
+        for _ in range(self.num_exps - 1):
             sio.write(docker_cmd+' &\n')
         sio.write(docker_cmd+'\n')
 
@@ -472,7 +476,7 @@ class EC2SpotDocker(DockerMode):
                 local_dir=local_output_dir,
                 s3_dir=s3_dir_path
             ))
-        if num_exps == 1:
+        if self.num_exps == 1:
             sio.write("aws s3 cp /home/ubuntu/user_data.log {s3_path}\n".format(
                 s3_path=os.path.join(s3_base_dir, 'stdout.log'),
             ))
