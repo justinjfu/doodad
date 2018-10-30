@@ -635,11 +635,14 @@ class CodalabDocker(DockerMode):
 
 
 class SingularityMode(LaunchMode):
-    def __init__(self, image, gpu=False, skip_wait=False):
+    def __init__(self, image, gpu=False, skip_wait=False, pre_cmd=None,
+                 post_cmd=None):
         super(SingularityMode, self).__init__()
         self.singularity_image = image
         self.gpu = gpu
         self.skip_wait = skip_wait
+        self.pre_cmd = pre_cmd
+        self.post_cmd = post_cmd
 
     def get_singularity_cmd(
             self,
@@ -647,12 +650,10 @@ class SingularityMode(LaunchMode):
             extra_args='',
             verbose=True,
             pythonpath=None,
-            pre_cmd=None,
-            post_cmd=None,
         ):
         cmd_list= CommandBuilder()
-        if pre_cmd:
-            cmd_list.extend(pre_cmd)
+        if self.pre_cmd:
+            cmd_list.extend(self.pre_cmd)
 
         if verbose:
             if self.gpu:
@@ -663,8 +664,8 @@ class SingularityMode(LaunchMode):
             cmd_list.append('export PYTHONPATH=$PYTHONPATH:%s' % (':'.join(pythonpath)))
 
         cmd_list.append(main_cmd)
-        if post_cmd:
-            cmd_list.extend(post_cmd)
+        if self.post_cmd:
+            cmd_list.extend(self.post_cmd)
 
         if self.gpu:
             extra_args += ' --nv '
@@ -678,8 +679,7 @@ class SingularityMode(LaunchMode):
 
 
 class LocalSingularity(SingularityMode):
-    def launch_command(self, cmd, mount_points=None, dry=False,
-                       verbose=False, pre_cmd=None, post_cmd=None):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
@@ -691,8 +691,6 @@ class LocalSingularity(SingularityMode):
         full_cmd = self.get_singularity_cmd(
             cmd,
             pythonpath=py_path,
-            pre_cmd=pre_cmd,
-            post_cmd=post_cmd,
             verbose=verbose,
         )
         call_and_wait(full_cmd, verbose=verbose, dry=dry,
@@ -717,10 +715,7 @@ class SlurmSingularity(LocalSingularity):
         self.n_tasks = n_tasks
         self.n_gpus = n_gpus
 
-    def create_slurm_command(self, cmd, mount_points=None,
-                             verbose=False, pre_cmd=None, post_cmd=None):
-        if pre_cmd is None:
-            pre_cmd = []
+    def create_slurm_command(self, cmd, mount_points=None, verbose=False):
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
@@ -732,8 +727,6 @@ class SlurmSingularity(LocalSingularity):
         singularity_cmd = self.get_singularity_cmd(
             cmd,
             pythonpath=py_path,
-            pre_cmd=pre_cmd,
-            post_cmd=post_cmd,
             verbose=verbose,
         )
         if self.gpu:
@@ -761,8 +754,11 @@ class SlurmSingularity(LocalSingularity):
         if verbose:
             print(full_cmd)
 
-    def launch_command(self, cmd, dry=False, **kwargs):
-        full_cmd = self.create_slurm_command(cmd, **kwargs)
+    # def launch_command(self, cmd, dry=False, **kwargs):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
+        full_cmd = self.create_slurm_command(
+            cmd, mount_points=mount_points, verbose=verbose,
+        )
         call_and_wait(full_cmd, dry=dry, skip_wait=self.skip_wait)
 
 
@@ -772,12 +768,24 @@ class ScriptSlurmSingularity(SlurmSingularity):
     """
     TMP_FILE = '/tmp/script_to_scp_over.sh'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_first_time = False
+
+    def set_first_time(self, is_first_time):
+        self.is_first_time = is_first_time
+
     def launch_command(
-            self, cmd, first_launch_command=False,
-            dry=False, **kwargs
+            self,
+            cmd,
+            dry=False,
+            mount_points=None,
+            verbose=False,
     ):
-        full_cmd = self.create_slurm_command(cmd, **kwargs)
-        if first_launch_command:
+        full_cmd = self.create_slurm_command(
+            cmd, mount_points=mount_points, verbose=verbose,
+        )
+        if self.is_first_time:
             with open(self.TMP_FILE, "w") as myfile:
                 myfile.write(full_cmd + '\n')
             # make file executable
