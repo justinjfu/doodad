@@ -422,6 +422,7 @@ class EC2SpotDocker(DockerMode):
                         then
                             logger "Running shutdown hook."
                             aws s3 cp --recursive {log_dir} {s3_path}
+                            aws s3 cp /home/ubuntu/user_data.log {s3_path}
                             break
                         else
                             # Spot instance not yet marked for termination.
