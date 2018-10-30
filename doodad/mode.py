@@ -21,12 +21,12 @@ class LaunchMode(object):
 
 
 class Local(LaunchMode):
-    def __init__(self):
+    def __init__(self, skip_wait=False):
         super(Local, self).__init__()
         self.env = {}
+        self.skip_wait = skip_wait
 
-    def launch_command(self, cmd, mount_points=None, dry=False,
-                       verbose=False, skip_wait=False):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         if dry:
             print(cmd); return
 
@@ -62,7 +62,8 @@ class Local(LaunchMode):
         commands.extend(cleanup_commands)
 
         # Call everything
-        commands.call_and_wait(verbose=verbose, dry=dry, skip_wait=skip_wait)
+        commands.call_and_wait(verbose=verbose, dry=dry,
+                               skip_wait=self.skip_wait)
 
 LOCAL = Local()
 
@@ -120,12 +121,12 @@ class DockerMode(LaunchMode):
 
 
 class LocalDocker(DockerMode):
-    def __init__(self, checkpoints=None, **kwargs):
+    def __init__(self, checkpoints=None, skip_wait=False, **kwargs):
         super(LocalDocker, self).__init__(**kwargs)
         self.checkpoints = checkpoints
+        self.skip_wait = skip_wait
 
-    def launch_command(self, cmd, mount_points=None, dry=False,
-                       verbose=False, skip_wait=False):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         mnt_args = ''
         py_path = []
         for mount in mount_points:
@@ -141,7 +142,8 @@ class LocalDocker(DockerMode):
 
         full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path,
                 checkpoint=self.checkpoints)
-        call_and_wait(full_cmd, verbose=verbose, dry=dry, skip_wait=skip_wait)
+        call_and_wait(full_cmd, verbose=verbose, dry=dry,
+                      skip_wait=self.skip_wait)
 
 
 class SSHDocker(DockerMode):
@@ -593,10 +595,11 @@ class CodalabDocker(DockerMode):
 
 
 class SingularityMode(LaunchMode):
-    def __init__(self, image, gpu=False):
+    def __init__(self, image, gpu=False, skip_wait=False):
         super(SingularityMode, self).__init__()
         self.singularity_image = image
         self.gpu = gpu
+        self.skip_wait = skip_wait
 
     def get_singularity_cmd(
             self,
@@ -636,8 +639,7 @@ class SingularityMode(LaunchMode):
 
 class LocalSingularity(SingularityMode):
     def launch_command(self, cmd, mount_points=None, dry=False,
-                       verbose=False, pre_cmd=None, post_cmd=None,
-                       skip_wait=False):
+                       verbose=False, pre_cmd=None, post_cmd=None):
         py_path = []
         for mount in mount_points:
             if isinstance(mount, MountLocal):
@@ -653,7 +655,8 @@ class LocalSingularity(SingularityMode):
             post_cmd=post_cmd,
             verbose=verbose,
         )
-        call_and_wait(full_cmd, verbose=verbose, dry=dry, skip_wait=skip_wait)
+        call_and_wait(full_cmd, verbose=verbose, dry=dry,
+                      skip_wait=self.skip_wait)
 
 
 class SlurmSingularity(LocalSingularity):
@@ -717,4 +720,4 @@ class SlurmSingularity(LocalSingularity):
             )
         if verbose:
             print(full_cmd)
-        call_and_wait(full_cmd, dry=dry)
+        call_and_wait(full_cmd, dry=dry, skip_wait=self.skip_wait)
