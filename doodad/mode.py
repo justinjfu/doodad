@@ -538,6 +538,7 @@ class EC2SpotDocker(DockerMode):
             print(full_script)
             with open("/tmp/full_ec2_script", "w") as f:
                 f.write(full_script)
+
         instance_args = dict(
             ImageId=aws_config["image_id"],
             KeyName=aws_config["key_name"],
@@ -630,16 +631,16 @@ class GCPDocker(DockerMode):
         self,
         zone="us-east4-a",
         gcp_bucket_name=None,
-        instance_type='n1-standard-8',
+        instance_type='n1-standard-4',
         image_name=None,
         image_project=None,
         disk_size:"Gb"=64,
         terminate=True,
+        preemptible=True,
         gcp_log_prefix='experiment',
         gcp_log_name=None,
         gcp_log_path=None,
         gpu_kwargs=None,
-        preemptible=True,
         **kwargs
     ):
         super(GCPDocker, self).__init__(**kwargs)
@@ -729,21 +730,14 @@ class GCPDocker(DockerMode):
             'startup-script': open(GCP_STARTUP_SCRIPT_PATH, "r").read(),
             'shutdown-script': open(GCP_SHUTDOWN_SCRIPT_PATH, "r").read(),
         }
-        unique_prefix = "doodad" + str(uuid.uuid4()).replace("-", "")
         # instance name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'">
-        import re
-        name_pattern = re.compile('(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)')
-        name = (exp_prefix + exp_name).replace("-", "").replace("_", "")
-        if not name_pattern.match(unique_prefix + name):
-            print(unique_prefix + name, " is not a valid GCP instance name")
-            name = ""
-        instance_name = unique_prefix + name
-
-        self.create_instance(metadata, name=instance_name)
+        unique_name= "doodad" + str(uuid.uuid4()).replace("-", "")
+        self.create_instance(metadata, unique_name, exp_name, exp_prefix)
         if verbose:
+            print(unique_name)
             print(metadata)
 
-    def create_instance(self, metadata, name):
+    def create_instance(self, metadata, name, exp_name="", exp_prefix=""):
         image_response = self.compute.images().get(
             project=self.image_project,
             image=self.image_name,
@@ -781,6 +775,10 @@ class GCPDocker(DockerMode):
                 "automaticRestart": False,
                 "preemptible": self.preemptible,
             },
+            "labels": {
+                "exp_name": exp_name,
+                "exp_prefix": exp_prefix,
+            }
         }
         if self.gpu:
             config["guestAccelerators"] = [{

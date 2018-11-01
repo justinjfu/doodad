@@ -1,7 +1,11 @@
 #!/bin/bash
+query_metadata() {
+    attribute_name=$1
+    curl http://metadata/computeMetadata/v1/instance/attributes/$attribute_name -H "Metadata-Flavor: Google"
+}
 
-bucket_name=$(curl http://metadata/computeMetadata/v1/instance/attributes/bucket_name -H "Metadata-Flavor: Google")
-gcp_mounts=$(curl http://metadata/computeMetadata/v1/instance/attributes/gcp_mounts -H "Metadata-Flavor: Google")
+bucket_name=$(query_metadata bucket_name)
+gcp_mounts=$(query_metadata gcp_mounts)
 instance_name=$(curl http://metadata/computeMetadata/v1/instance/name -H "Metadata-Flavor: Google")
 
 num_gcp_mounts=$(jq length <<< $gcp_mounts)
