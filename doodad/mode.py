@@ -5,16 +5,18 @@ import tempfile
 import uuid
 import time
 import base64
+import json
 
 try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
 
-from .mount import MountLocal, MountS3
-from .utils import hash_file, call_and_wait, CommandBuilder
+from .mount import MountLocal, MountS3, MountGCP
+from .utils import hash_file, call_and_wait, CommandBuilder, REPO_DIR
 from .ec2.aws_util import s3_upload, s3_exists
-
+from .gcp.gcp_util import GCP_STARTUP_SCRIPT_PATH, GCP_SHUTDOWN_SCRIPT_PATH, \
+        upload_file_to_gcp_storage, get_machine_type, get_gpu_type
 
 class LaunchMode(object):
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
@@ -623,6 +625,171 @@ class EC2AutoconfigDocker(EC2SpotDocker):
                 **kwargs
                 )
 
+
+class GCPDocker(DockerMode):
+    def __init__(
+        self,
+        zone="us-east4-a",
+        gcp_bucket_name=None,
+        instance_type='n1-standard-4',
+        image_name=None,
+        image_project=None,
+        disk_size:"Gb"=64,
+        terminate=True,
+        preemptible=True,
+        gcp_log_prefix='experiment',
+        gcp_log_name=None,
+        gcp_log_path=None,
+        gpu_kwargs=None,
+        **kwargs
+    ):
+        super(GCPDocker, self).__init__(**kwargs)
+        assert 'CLOUDSDK_CORE_PROJECT' in os.environ.keys()
+        self.project = os.environ['CLOUDSDK_CORE_PROJECT']
+        self.zone = zone
+        self.gcp_bucket_name = gcp_bucket_name
+        self.instance_type = instance_type
+        self.terminate = terminate
+        self.disk_size = disk_size
+        self.image_project = image_project
+        self.image_name = image_name
+        self.preemptible = preemptible
+
+        self.gcp_log_prefix = gcp_log_prefix
+        self.gcp_log_name = gcp_log_name
+        self.gcp_log_path = gcp_log_path or 'doodad/logs'
+        if self.gpu:
+            self.num_gpu = gpu_kwargs['num_gpu']
+            self.gpu_model = gpu_kwargs['gpu_model']
+            self.gpu_type = get_gpu_type(self.project, self.zone, self.gpu_model)
+
+        import googleapiclient.discovery
+        self.compute = googleapiclient.discovery.build('compute', 'v1')
+
+    def launch_command(self, main_cmd, mount_points=None, dry=False, verbose=False):
+        if self.gcp_log_name is None:
+            exp_name = "{}-{}".format(self.gcp_log_prefix, EC2SpotDocker.make_timekey(self))
+        else:
+            exp_name = self.gcp_log_name
+        exp_prefix = self.gcp_log_prefix
+        gcp_base_dir = os.path.join(self.gcp_log_path, exp_prefix.replace("_", "-"), exp_name)
+
+        mnt_args = ''
+        py_path = []
+        gcp_mount_info = []
+        max_sync_interval = 0
+        local_mounts = []
+        for mount in mount_points:
+            print('Handling mount: ', mount)
+            if isinstance(mount, MountLocal):  # TODO: these should be mount_s3 objects
+                if mount.read_only:
+                    if mount.path_on_remote is None:
+                        with mount.gzip() as gzip_file:
+                            gzip_path = os.path.realpath(gzip_file)
+                            file_hash = hash_file(gzip_path)
+                            gcp_path = upload_file_to_gcp_storage(
+                                bucket_name=self.gcp_bucket_name,
+                                file_name=gzip_path,
+                                remote_filename=file_hash+'.tar'
+                            )
+                        mount.path_on_remote = gcp_path
+                        mount.local_file_hash = file_hash
+                    else:
+                        file_hash = mount.local_file_hash
+                        gcp_path = mount.path_on_remote
+                    remote_unpack_name = '/tmp/'+file_hash
+                    mount_point =  os.path.join('/mounts', mount.mount_point.replace('~/',''))
+                    mnt_args += ' -v %s:%s' % (os.path.join(remote_unpack_name, os.path.basename(mount.local_dir)), mount_point)
+                    if mount.pythonpath:
+                        py_path.append(mount_point)
+                    local_mounts.append(file_hash)
+                else:
+                    raise ValueError()
+            elif isinstance(mount, MountGCP):
+                gcp_local_dir = mount.mount_point
+                gcp_path = os.path.join(gcp_base_dir, mount.gcp_path)
+                if not mount.output:
+                    raise NotImplementedError()
+                gcp_mount_info.append(
+                    (gcp_local_dir, gcp_path, mount.include_string, mount.sync_interval)
+                )
+                mnt_args += ' -v %s:%s' % (gcp_local_dir, mount.mount_point)
+            else:
+                raise NotImplementedError()
+
+        docker_cmd = self.get_docker_cmd(main_cmd, use_tty=False, extra_args=mnt_args, pythonpath=py_path)
+
+        metadata = {
+            'bucket_name': self.gcp_bucket_name,
+            'docker_cmd': docker_cmd,
+            'docker_image': self.docker_image,
+            'local_mounts': json.dumps(local_mounts),
+            'gcp_mounts': json.dumps(gcp_mount_info),
+            'use_gpu': json.dumps(self.gpu),
+            'terminate': json.dumps(self.terminate),
+            'startup-script': open(GCP_STARTUP_SCRIPT_PATH, "r").read(),
+            'shutdown-script': open(GCP_SHUTDOWN_SCRIPT_PATH, "r").read(),
+        }
+        # instance name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'">
+        unique_name= "doodad" + str(uuid.uuid4()).replace("-", "")
+        self.create_instance(metadata, unique_name, exp_name, exp_prefix)
+        if verbose:
+            print(unique_name)
+            print(metadata)
+
+    def create_instance(self, metadata, name, exp_name="", exp_prefix=""):
+        image_response = self.compute.images().get(
+            project=self.image_project,
+            image=self.image_name,
+        ).execute()
+        source_disk_image = image_response['selfLink']
+        config = {
+            'name': name,
+            'machineType': get_machine_type(self.zone, self.instance_type),
+            'disks': [{
+                    'boot': True,
+                    'autoDelete': True,
+                    'initializeParams': {
+                        'sourceImage': source_disk_image,
+                        'diskSizeGb': self.disk_size,
+                    }
+            }],
+            'networkInterfaces': [{
+                'network': 'global/networks/default',
+                'accessConfigs': [
+                    {'type': 'ONE_TO_ONE_NAT', 'name': 'External NAT'}
+                ]
+            }],
+            'serviceAccounts': [{
+                'email': 'default',
+                'scopes': ['https://www.googleapis.com/auth/cloud-platform']
+            }],
+            'metadata': {
+                'items': [
+                    {'key': key, 'value': value}
+                    for key, value in metadata.items()
+                ]
+            },
+            'scheduling': {
+                "onHostMaintenance": "terminate",
+                "automaticRestart": False,
+                "preemptible": self.preemptible,
+            },
+            "labels": {
+                "exp_name": exp_name,
+                "exp_prefix": exp_prefix,
+            }
+        }
+        if self.gpu:
+            config["guestAccelerators"] = [{
+                      "acceleratorType": self.gpu_type,
+                      "acceleratorCount": self.num_gpu,
+            }]
+        return self.compute.instances().insert(
+            project=self.project,
+            zone=self.zone,
+            body=config
+        ).execute()
 
 class CodalabDocker(DockerMode):
     def __init__(self):
