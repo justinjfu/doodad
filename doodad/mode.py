@@ -387,6 +387,8 @@ class EC2SpotDocker(DockerMode):
                 #               spot instance
                 ec2_local_dir = mount.mount_point
                 s3_path = os.path.join(s3_base_dir, mount.s3_path)
+                if self.num_exps == 1:
+                    stdout_log_s3_path = os.path.join(s3_path, 'stdout_$EC2_INSTANCE_ID.log')
                 if not mount.output:
                     raise NotImplementedError()
                 local_output_dir_and_s3_path.append(
@@ -628,8 +630,8 @@ class CodalabDocker(DockerMode):
 
 
 class SingularityMode(LaunchMode):
-    def __init__(self, image, gpu=False, skip_wait=False, pre_cmd=None,
-                 post_cmd=None):
+    def __init__(self, image, gpu=False, pre_cmd=None,
+                 post_cmd=None, skip_wait=False):
         super(SingularityMode, self).__init__()
         self.singularity_image = image
         self.gpu = gpu
@@ -748,7 +750,6 @@ class SlurmSingularity(LocalSingularity):
             print(full_cmd)
         return full_cmd
 
-    # def launch_command(self, cmd, dry=False, **kwargs):
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         full_cmd = self.create_slurm_command(
             cmd, mount_points=mount_points, verbose=verbose,
