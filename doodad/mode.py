@@ -449,7 +449,7 @@ class EC2SpotDocker(DockerMode):
             sleep {periodic_sync_interval}
         done & echo sync initiated
         """.format(
-            s3_path=stdout_log_s3_path,
+            stdout_log_s3_path=stdout_log_s3_path,
             periodic_sync_interval=max_sync_interval
         ))
 
@@ -493,7 +493,7 @@ class EC2SpotDocker(DockerMode):
                 local_dir=local_output_dir,
                 s3_dir=s3_dir_path
             ))
-            
+
         sio.write("aws s3 cp /home/ubuntu/user_data.log {}\n".format(
             stdout_log_s3_path,
         ))
