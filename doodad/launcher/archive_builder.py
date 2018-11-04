@@ -41,6 +41,7 @@ def write_metadata(arch_dir):
 def write_run_script(arch_dir, mounts, verbose=False):
     runfile = os.path.join(arch_dir, 'run.sh')
     with open(runfile, 'w') as f:
+        f.write('#!/bin/bash\n')
         f.write('echo Running Doodad Archive [DAR] $1\n')
         f.write('echo DAR build information:\n')
         f.write('cat ./METADATA\n')
@@ -70,7 +71,13 @@ def compile_archive(archive_dir, output_file):
 
 if __name__ == "__main__":
     import doodad.launcher.mount
-    mnt = doodad.launcher.mount.MountLocal(local_dir='./doodad')
-    build_archive('runfile.dar', verbose=True,
-    mounts=[mnt])
+    mnts = []
+    mnts.append(doodad.launcher.mount.MountLocal(local_dir='./doodad'))
+    mnts.append(doodad.launcher.mount.MountGit(
+        git_url='git@github.com:justinjfu/doodad.git',
+        branch='v2',
+        mount_point='./doodad'
+    ))
+    
+    build_archive('runfile.dar', verbose=True, mounts=mnts)
   
