@@ -25,6 +25,11 @@ python scripts/ec2_setup.py
 
 - (Optional) Set up [Docker](https://docs.docker.com/engine/installation/). This is required on the target machine if running in a Docker-enabled mode.
 
+- (Optional) Set up GCP
+  - https://cloud.google.com/sdk/docs/quickstart-debian-ubuntu
+  - https://cloud.google.com/compute/docs/tutorials/python-guide
+  - https://cloud.google.com/storage/docs/reference/libraries#client-libraries-install-python
+
 
 ## Example
 
