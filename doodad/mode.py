@@ -72,11 +72,12 @@ LOCAL = Local()
 
 
 class DockerMode(LaunchMode):
-    def __init__(self, image='ubuntu:16.04', gpu=False):
+    def __init__(self, image='ubuntu:16.04', gpu=False, gpu_id=-1):
         super(DockerMode, self).__init__()
         self.docker_image = image
         self.docker_name = uuid.uuid4()
         self.gpu = gpu
+        self.gpu_id = gpu_id    # default of -1 results in all local gpus made available
 
     def get_docker_cmd(self, main_cmd, extra_args='', use_tty=True, verbose=True, pythonpath=None, pre_cmd=None, post_cmd=None,
             checkpoint=False, no_root=False, use_docker_generated_name=False):
@@ -87,6 +88,8 @@ class DockerMode(LaunchMode):
         if verbose:
             if self.gpu:
                 cmd_list.append('echo \"Running in docker (gpu)\"')
+                if self.gpu_id > -1:
+                    cmd_list.append('echo \"Restricting to gpu_id=%d\"' % self.gpu_id)
             else:
                 cmd_list.append('echo \"Running in docker\"')
         if pythonpath:
@@ -112,12 +115,15 @@ class DockerMode(LaunchMode):
             use_tty = False
             extra_args += ' -d '  # detach is optional
 
-        if use_tty:
-            docker_prefix = 'docker run %s -ti %s /bin/bash -c ' % (extra_args, self.docker_image)
-        else:
-            docker_prefix = 'docker run %s %s /bin/bash -c ' % (extra_args, self.docker_image)
+        docker_prefix = 'docker run'
         if self.gpu:
-            docker_prefix = 'nvidia-'+docker_prefix
+            docker_prefix = 'nvidia-' + docker_prefix
+            if self.gpu_id > -1:
+                docker_prefix = '%s -e NVIDIA_VISIBLE_DEVICES=%d' % (docker_prefix, self.gpu_id)
+        if use_tty:
+            docker_prefix = '%s %s -ti %s /bin/bash -c ' % (docker_prefix, extra_args, self.docker_image)
+        else:
+            docker_prefix = '%s %s %s /bin/bash -c ' % (docker_prefix, extra_args, self.docker_image)
         main_cmd = cmd_list.to_string()
         full_cmd = docker_prefix + ("\'%s\'" % main_cmd)
         return full_cmd
@@ -129,7 +135,7 @@ class LocalDocker(DockerMode):
         self.checkpoints = checkpoints
         self.skip_wait = skip_wait
 
-    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
+    def launch_command(self, cmd, mount_points=None, dry=False, verbose=False, extra_args=''):
         mnt_args = ''
         py_path = []
         for mount in mount_points:
@@ -143,7 +149,7 @@ class LocalDocker(DockerMode):
             else:
                 raise NotImplementedError(type(mount))
 
-        full_cmd = self.get_docker_cmd(cmd, extra_args=mnt_args, pythonpath=py_path,
+        full_cmd = self.get_docker_cmd(cmd, extra_args=extra_args + mnt_args, pythonpath=py_path,
                 checkpoint=self.checkpoints)
         call_and_wait(full_cmd, verbose=verbose, dry=dry,
                       skip_wait=self.skip_wait)
