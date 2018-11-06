@@ -76,7 +76,7 @@ class MountLocal(Mount):
         self.filter_ext = filter_ext
         self.filter_dir = filter_dir
         if mount_point is None:
-            self.mount_point = mount_point
+            self.mount_point = self.local_dir
             self.no_remount = True
         else:
             self.no_remount = False
@@ -86,11 +86,18 @@ class MountLocal(Mount):
         os.makedirs(os.path.join(deps_dir, 'local'))
         shutil.copytree(self.local_dir, dep_dir)
 
+        extract_file = os.path.join(dep_dir, 'extract.sh')
+        with open(extract_file, 'w') as f:
+            mount_point = os.path.dirname(self.mount_point)
+            f.write('mkdir -p %s\n' % mount_point)
+            #print(dep_dir) 
+            #f.write('ln -s $USER_PWD/archive/deps/local/%s %s\n' % (self.name, self.mount_point))
+            f.write('mv ./deps/local/{name} {mount}'.format(name=self.name, mount=self.mount_point))
+        os.chmod(extract_file, 0o777)
+
     def dar_extract_command(self):
-        # make a symlink to mount dir
-        return 'ln -s ./deps/local/{dep_name} {mount}'.format(
-            dep_name=self.name,
-            mount=self.mount_point
+        return './deps/local/{name}/extract.sh'.format(
+            name=self.name,
         )
 
     def __str__(self):
@@ -118,11 +125,12 @@ class MountGit(Mount):
         extract_file = os.path.join(dep_dir, 'extract.sh')
         with open(extract_file, 'w') as f:
             mount_point = os.path.dirname(self.mount_point)
+            f.write('mkdir -p %s\n' % mount_point)
             f.write('pushd %s\n' % mount_point)
             f.write("git clone {repo_url}\n".format(repo_url=self.git_url))
             if self.branch:
                 f.write('cd {repo_name}\n'.format(repo_name=self.repo_name))
-                f.write("mkdir -p {local_code_path}\n".format(local_code_path=mount_point))
+                f.write('git checkout {branch}\n'.format(branch=self.branch))
             f.write('popd')
         os.chmod(extract_file, 0o777)
 

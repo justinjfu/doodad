@@ -42,27 +42,22 @@ class CommandBuilder(object):
     def __init__(self):
         self.cmds = []
 
-    def add_command(self, cmd):
-        self.cmds.append(cmd)
-
-    def append(self, cmd):
-        self.add_command(cmd)
-
-    def extend(self, other):
-        if isinstance(other, CommandBuilder):
-            self.cmds.extend(other.cmds)
-        else:
-            self.cmds.extend(other)
+    def add_command(self, cmd, args=None):
+        self.cmds.append(cmd + ' ' + args)
 
     def to_string(self, separator=';'):
-        return ';'.join([str(cmd) for cmd in self.cmds])
+        return ';'.join([str(cmd) for cmd in self])
 
     def __str__(self):
         return self.to_string()
 
     def __iter__(self):
         for cmd in self.cmds:
-            yield cmd
+            if isinstance(cmd, CommandBuilder):
+                for cmd_ in cmd:
+                    yield cmd_
+            else:
+                yield cmd
 
     def call_and_wait(self, verbose=False, dry=False):
         return call_and_wait(self.to_string())

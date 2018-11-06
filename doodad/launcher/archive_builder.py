@@ -5,12 +5,14 @@ import time
 import subprocess
 
 import doodad
+from doodad.launcher import cmd_util
 
 THIS_FILE_DIR = os.path.dirname(__file__)
 MAKESELF_PATH = os.path.join(THIS_FILE_DIR, 'makeself.sh')
 MAKESELF_HEADER_PATH = os.path.join(THIS_FILE_DIR, 'makeself-header.sh')
 
 def build_archive(output_file, 
+                  payload_script='',
                   launch_mode=None,
                   mounts=(),
                   verbose=False):
@@ -25,7 +27,8 @@ def build_archive(output_file,
         for mount in mounts:
             mount.dar_build_archive(deps_dir)
         
-        write_run_script(archive_dir, mounts, verbose=verbose)  #TODO:depends on launch mode
+        write_run_script(archive_dir, mounts, 
+            payload_script=payload_script, verbose=verbose)  #TODO:depends on launch mode
         write_metadata(archive_dir)
 
         # create the self-extracting archive
@@ -38,17 +41,20 @@ def write_metadata(arch_dir):
         f.write('doodad_version=%s\n' % doodad.__version__)
         f.write('unix_timestamp=%d\n' % time.time())
 
-def write_run_script(arch_dir, mounts, verbose=False):
+def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     runfile = os.path.join(arch_dir, 'run.sh')
+    cmd_builder = cmd_util.CommandBuilder()
+    cmd_builder.append('#!/bin/bash')
+    cmd_builder.append('echo', 'Running Doodad Archive [DAR] $1')
+    cmd_builder.append('echo', 'DAR build information:')
+    cmd_builder.append('cat', './METADATA')
+    for mount in mounts:
+        cmd_builder.append('echo', 'Mounting %s' % mount)
+        cmd_builder.append(mount.dar_extract_command())
+    cmd_builder.append(payload_script)
+
     with open(runfile, 'w') as f:
-        f.write('#!/bin/bash\n')
-        f.write('echo Running Doodad Archive [DAR] $1\n')
-        f.write('echo DAR build information:\n')
-        f.write('cat ./METADATA\n')
-        # set up docker?
-        for mount in mounts:
-            f.write('echo Mounting %s\n' % mount)
-            f.write(mount.dar_extract_command()+'\n')
+        f.write(cmd_builder.dump_script())
 
     if verbose:
         print('[VERBOSE] Run script:')
@@ -72,12 +78,18 @@ def compile_archive(archive_dir, output_file):
 if __name__ == "__main__":
     import doodad.launcher.mount
     mnts = []
-    mnts.append(doodad.launcher.mount.MountLocal(local_dir='./doodad'))
+    mnts.append(doodad.launcher.mount.MountLocal(local_dir='./',
+                                                mount_point='./code/doodad2'))
     mnts.append(doodad.launcher.mount.MountGit(
         git_url='git@github.com:justinjfu/doodad.git',
         branch='v2',
-        mount_point='./doodad'
+        mount_point='./code/doodad'
     ))
+
+    payload_script = cmd_util.CommandBuilder()
+    payload_script.append('python', './code/doodad/scripts/pull_s3_logs.py')
     
-    build_archive('runfile.dar', verbose=True, mounts=mnts)
+    build_archive('runfile.dar', 
+        payload_script=payload_script,
+        verbose=True, mounts=mnts)
   
