@@ -109,12 +109,12 @@ class MountLocal(Mount):
 
 class MountGit(Mount):
     def __init__(self, git_url, branch=None,
-                 git_credentials=None, **kwargs):
+                 ssh_identity=None, **kwargs):
         super(MountGit, self).__init__(output=False, **kwargs)
         self.git_url = git_url
         self.repo_name = os.path.splitext(os.path.split(git_url)[1])[0]
         assert self.mount_point.endswith(self.repo_name)
-        self.git_credentials = git_credentials
+        self.ssh_identity = ssh_identity
         self.branch = branch
         self._name = self.repo_name
 
@@ -127,7 +127,10 @@ class MountGit(Mount):
             mount_point = os.path.dirname(self.mount_point)
             f.write('mkdir -p %s\n' % mount_point)
             f.write('pushd %s\n' % mount_point)
-            f.write("git clone {repo_url}\n".format(repo_url=self.git_url))
+            if self.ssh_identity:
+                f.write("GIT_SSH_COMMAND='ssh -i {id}' git clone {repo_url}\n".format(id=self.ssh_identity, repo_url=self.git_url))
+            else:
+                f.write("git clone {repo_url}\n".format(repo_url=self.git_url))
             if self.branch:
                 f.write('cd {repo_name}\n'.format(repo_name=self.repo_name))
                 f.write('git checkout {branch}\n'.format(branch=self.branch))

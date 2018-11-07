@@ -75,6 +75,11 @@ def compile_archive(archive_dir, output_file):
     subprocess.call(compile_cmd, shell=True)
     os.chmod(output_file, 0o777)
 
+def run_archive(filename):
+    if '/' not in filename:
+        filename = './'+filename
+    return subprocess.call([filename])
+
 if __name__ == "__main__":
     import doodad.launcher.mount
     mnts = []
