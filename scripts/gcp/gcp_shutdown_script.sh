@@ -17,4 +17,5 @@ for ((i=0;i<$num_gcp_mounts;i++)); do
     gsutil -m rsync -r $local_path gs://$bucket_name/$gcp_bucket_path
 done
 
+gcp_bucket_path=${gcp_bucket_path%/}  # remove trailing slash if present
 gsutil cp /home/ubuntu/user_data.log gs://$bucket_name/$gcp_bucket_path/${instance_name}_stdout.log
