@@ -495,7 +495,6 @@ class EC2SpotDocker(DockerMode):
                 local_dir=local_output_dir,
                 s3_dir=s3_dir_path
             ))
-
         sio.write("aws s3 cp /home/ubuntu/user_data.log {}\n".format(
             stdout_log_s3_path,
         ))
@@ -803,9 +802,9 @@ class SingularityMode(LaunchMode):
         super(SingularityMode, self).__init__()
         self.singularity_image = image
         self.gpu = gpu
+        self.skip_wait = skip_wait
         self.pre_cmd = pre_cmd
         self.post_cmd = post_cmd
-        self.skip_wait = skip_wait
 
     def get_singularity_cmd(
             self,
@@ -916,6 +915,7 @@ class SlurmSingularity(LocalSingularity):
             )
         if verbose:
             print(full_cmd)
+        return full_cmd
 
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         full_cmd = self.create_slurm_command(

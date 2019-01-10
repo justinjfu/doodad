@@ -69,6 +69,7 @@ query_metadata() {
             sleep $periodic_sync_interval
         done & echo sync from $local_path to gs://$bucket_name/$gcp_bucket_path initiated
     done
+    gcp_bucket_path=${gcp_bucket_path%/}  # remove trailing slash if present
     while /bin/true; do
         gsutil cp /home/ubuntu/user_data.log gs://$bucket_name/$gcp_bucket_path/${instance_name}_stdout.log
         sleep 300
