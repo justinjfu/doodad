@@ -72,7 +72,7 @@ LOCAL = Local()
 
 
 class DockerMode(LaunchMode):
-    def __init__(self, image='ubuntu:16.04', gpu=False):
+    def __init__(self, image='ubuntu:18.04', gpu=False):
         super(DockerMode, self).__init__()
         self.docker_image = image
         self.docker_name = uuid.uuid4()
@@ -634,8 +634,8 @@ class GCPDocker(DockerMode):
         zone="us-east4-a",
         gcp_bucket_name=None,
         instance_type='n1-standard-4',
-        image_name=None,
-        image_project=None,
+        image_name='ubuntu-1804-bionic-v20181222',
+        image_project='ubuntu-os-cloud',
         disk_size:"Gb"=64,
         terminate=True,
         preemptible=True,

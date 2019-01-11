@@ -4,7 +4,7 @@ import doodad
 import doodad.mode
 import doodad.mount as mount
 from doodad.utils import REPO_DIR
-from doodad.easy_sweep.hyper_sweep import run_sweep_doodad, run_sweep_parallel, run_sweep_serial, run_single_doodad
+from doodad.easy_sweep.hyper_sweep import run_sweep_doodad, run_sweep_parallel, run_sweep_serial, run_single_doodad, run_sweep_doodad_chunked
 
 INSTANCE_TO_PRICE = {
     'c4.large': 0.04,
@@ -20,6 +20,9 @@ class DoodadSweeper(object):
             docker_output_dir='/data',
             local_output_dir='data/docker',
             python_cmd='python',
+            gcp_bucket_name=None,
+            gcp_image=None,
+            gcp_project=None,
             ):
 
         self.image = docker_img
@@ -32,6 +35,11 @@ class DoodadSweeper(object):
         self.mounts = mounts
         self.mount_out_local = mount.MountLocal(local_dir=local_output_dir, mount_point=docker_output_dir, output=True)
         self.mount_out_s3 = mount.MountS3(s3_path='exp_logs', mount_point=docker_output_dir, output=True)
+
+        self.gcp_bucket_name = gcp_bucket_name
+        self.gcp_image = gcp_image
+        self.gcp_project = gcp_project
+        self.mount_out_gcp = mount.MountGCP(gcp_path='exp_logs', gcp_bucket_name=gcp_bucket_name, mount_point=docker_output_dir, output=True)
 
     def run_sweep_serial(self, run_method, params, repeat=1):
         run_sweep_serial(run_method, params, repeat=repeat)
@@ -109,6 +117,84 @@ class DoodadSweeper(object):
         run_single_doodad(run_method, params, run_mode=mode_ec2, 
                 python_cmd=self.python_cmd,
                 mounts=self.mounts+[self.mount_out_s3]+extra_mounts, 
+                args=args)
+
+    def run_sweep_gcp(self, run_method, params, 
+                      s3_log_name=None, add_date_to_logname=True,
+                      region='us-west1-a', instance_type='n1-standard-4', repeat=1, args=None,
+                      extra_mounts=None):
+        if extra_mounts is None:
+            extra_mounts = []
+        if s3_log_name is None:
+            s3_log_name = 'unnamed_experiment'
+        if add_date_to_logname:
+            datestamp = datetime.now().strftime('%Y_%m_%d')
+            s3_log_name = '%s_%s' % (datestamp, s3_log_name)
+
+        mode_ec2 = doodad.mode.GCPDocker(
+            image=self.image,
+            zone=region,
+            gcp_bucket_name=self.gcp_bucket_name,
+            instance_type=instance_type,
+            gcp_log_prefix=s3_log_name,
+            image_name=self.gcp_image,
+            image_project=self.gcp_project,
+        )
+        run_sweep_doodad(run_method, params, run_mode=mode_ec2, 
+                python_cmd=self.python_cmd,
+                mounts=self.mounts+[self.mount_out_gcp]+extra_mounts, 
+                repeat=repeat, args=args)
+
+    def run_sweep_gcp_chunked(self, run_method, params, num_chunks, 
+                      s3_log_name=None, add_date_to_logname=True,
+                      region='us-west1-a', instance_type='n1-standard-4', repeat=1, args=None,
+                      extra_mounts=None):
+        if extra_mounts is None:
+            extra_mounts = []
+        if s3_log_name is None:
+            s3_log_name = 'unnamed_experiment'
+        if add_date_to_logname:
+            datestamp = datetime.now().strftime('%Y_%m_%d')
+            s3_log_name = '%s_%s' % (datestamp, s3_log_name)
+
+        mode_ec2 = doodad.mode.GCPDocker(
+            image=self.image,
+            zone=region,
+            gcp_bucket_name=self.gcp_bucket_name,
+            instance_type=instance_type,
+            gcp_log_prefix=s3_log_name,
+            image_name=self.gcp_image,
+            image_project=self.gcp_project,
+        )
+        run_sweep_doodad_chunked(run_method, params, run_mode=mode_ec2, num_chunks=num_chunks,
+                python_cmd=self.python_cmd,
+                mounts=self.mounts+[self.mount_out_gcp]+extra_mounts, 
+                repeat=repeat, args=args)
+
+    def run_single_gcp(self, run_method, params, 
+                      s3_log_name=None, add_date_to_logname=True,
+                      region='us-west1-a', instance_type='n1-standard-4', args=None,
+                      extra_mounts=None):
+        if extra_mounts is None:
+            extra_mounts = []
+        if s3_log_name is None:
+            s3_log_name = 'unnamed_experiment'
+        if add_date_to_logname:
+            datestamp = datetime.now().strftime('%Y_%m_%d')
+            s3_log_name = '%s_%s' % (datestamp, s3_log_name)
+
+        mode_ec2 = doodad.mode.GCPDocker(
+            image=self.image,
+            zone=region,
+            gcp_bucket_name=self.gcp_bucket_name,
+            instance_type=instance_type,
+            gcp_log_prefix=s3_log_name,
+            image_name=self.gcp_image,
+            image_project=self.gcp_project,
+        )
+        run_single_doodad(run_method, params, run_mode=mode_ec2, 
+                python_cmd=self.python_cmd,
+                mounts=self.mounts+[self.mount_out_gcp]+extra_mounts, 
                 args=args)
 
 if __name__ == "__main__":

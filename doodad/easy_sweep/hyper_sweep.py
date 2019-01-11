@@ -21,6 +21,7 @@ from datetime import datetime
 
 import doodad
 from doodad.utils import REPO_DIR
+import hashlib
 
 
 class Sweeper(object):
@@ -39,6 +40,24 @@ class Sweeper(object):
                     kwargs['exp_name'] = "%s_%d" % (timestamp, count)
                 count += 1
                 yield kwargs
+
+
+def chunker(sweeper, num_chunks=10):
+    chunks = [ [] for _ in range(num_chunks) ]
+    print('computing chunks')
+    for config in sweeper:
+        hash_ = int(hashlib.md5(repr(config).encode('utf-8')).hexdigest(), 16)
+        task_chunk = hash_ % num_chunks
+        chunks[task_chunk].append(config)
+    print('num chunks:  ', num_chunks)
+    print('chunk sizes: ', [len(chunk) for chunk in chunks])
+    print('total jobs:  ', sum([len(chunk) for chunk in chunks]))
+    print('continue?(y/n)')
+    resp = str(input())
+    if resp == 'y':
+        return chunks
+    else:
+        return []
 
 
 def run_sweep_serial(run_method, params, repeat=1):
@@ -83,11 +102,33 @@ def run_sweep_doodad(run_method, params, run_mode, mounts, repeat=1, test_one=Fa
             break
 
 
+def run_sweep_doodad_chunked(run_method, params, run_mode, mounts, repeat=1, test_one=False, args=None, python_cmd='python',
+        num_chunks=10):
+    if args is None:
+        args = {}
+    sweeper = Sweeper(params, repeat)
+
+    for configs in chunker(sweeper, num_chunks=num_chunks):
+        def run_method_args():
+            for config in configs:
+                run_method(**config)
+        args['run_method'] = run_method_args
+        doodad.launch_python(
+                target = os.path.join(SCRIPTS_DIR, 'run_experiment_lite_doodad.py'),
+                mode=run_mode,
+                mount_points=mounts,
+                use_cloudpickle=True,
+                python_cmd=python_cmd,
+                args=args,
+        )
+        if test_one:
+            break
+
+
 def run_single_doodad(run_method, kwargs, run_mode, mounts, repeat=1, args=None, python_cmd='python'):
     """ Run a single function via doodad """
     if args is None:
         args = {}
-    #sweeper = Sweeper(params, repeat)
     def run_method_args():
         run_method(**kwargs)
     args['run_method'] = run_method_args
