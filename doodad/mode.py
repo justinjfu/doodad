@@ -121,9 +121,10 @@ class DockerMode(LaunchMode):
 
 
 class LocalDocker(DockerMode):
-    def __init__(self, checkpoints=None, **kwargs):
+    def __init__(self, checkpoints=None, async=True, **kwargs):
         super(LocalDocker, self).__init__(**kwargs)
         self.checkpoints = checkpoints
+        self.async = async
 
     def launch_command(self, cmd, mount_points=None, dry=False, verbose=False):
         mnt_args = ''
@@ -143,7 +144,7 @@ class LocalDocker(DockerMode):
                 checkpoint=self.checkpoints)
         if verbose:
             print(full_cmd)
-        call_and_wait(full_cmd, dry=dry)
+        call_and_wait(full_cmd, dry=dry, wait=not self.async)
 
 
 class SSHDocker(DockerMode):
@@ -221,7 +222,7 @@ class EC2SpotDocker(DockerMode):
     def __init__(self,
             credentials,
             region='us-west-1',
-            s3_bucket_region='us-west-1',
+            s3_bucket_region=None,
             instance_type='m1.small',
             spot_price=0.0,
             s3_bucket=None,
@@ -242,6 +243,8 @@ class EC2SpotDocker(DockerMode):
             security_group_ids = []
         if security_groups is None:
             security_groups = []
+        if s3_bucket_region is None:
+            s3_bucket_region = region
         self.credentials = credentials
         self.region = region
         self.s3_bucket_region = s3_bucket_region

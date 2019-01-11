@@ -21,13 +21,14 @@ def hash_file(filename):
     return hasher.hexdigest()
 
 
-def call_and_wait(cmd, verbose=False, dry=False):
+def call_and_wait(cmd, wait=True, verbose=False, dry=False):
     if dry or verbose:
         print(cmd)
     if not dry:
         p = subprocess.Popen(cmd, shell=True)
     try:
-        p.wait()
+        if wait:
+            p.wait()
     except KeyboardInterrupt:
         try:
             print("terminating")
@@ -35,7 +36,8 @@ def call_and_wait(cmd, verbose=False, dry=False):
         except OSError:
             print("os error!")
             pass
-        p.wait()
+        if wait:
+            p.wait()
 
 
 class CommandBuilder(object):

@@ -63,33 +63,41 @@ def run_sweep_parallel(run_method, params, repeat=1, num_cpu=multiprocessing.cpu
 
 
 SCRIPTS_DIR = os.path.join(REPO_DIR, 'scripts')
-def run_sweep_doodad(run_method, params, run_mode, mounts, repeat=1, test_one=False):
+def run_sweep_doodad(run_method, params, run_mode, mounts, repeat=1, test_one=False, args=None, python_cmd='python'):
+    if args is None:
+        args = {}
     sweeper = Sweeper(params, repeat)
     for config in sweeper:
         def run_method_args():
             run_method(**config)
+        args['run_method'] = run_method_args
         doodad.launch_python(
                 target = os.path.join(SCRIPTS_DIR, 'run_experiment_lite_doodad.py'),
                 mode=run_mode,
                 mount_points=mounts,
                 use_cloudpickle=True,
-                args = {'run_method': run_method_args},
+                python_cmd=python_cmd,
+                args=args,
         )
         if test_one:
             break
 
 
-def run_single_doodad(run_method, kwargs, run_mode, mounts, repeat=1):
+def run_single_doodad(run_method, kwargs, run_mode, mounts, repeat=1, args=None, python_cmd='python'):
     """ Run a single function via doodad """
-    sweeper = Sweeper(params, repeat)
+    if args is None:
+        args = {}
+    #sweeper = Sweeper(params, repeat)
     def run_method_args():
         run_method(**kwargs)
+    args['run_method'] = run_method_args
     doodad.launch_python(
             target = os.path.join(SCRIPTS_DIR, 'run_experiment_lite_doodad.py'),
             mode=run_mode,
             mount_points=mounts,
             use_cloudpickle=True,
-            args = {'run_method': run_method_args},
+            python_cmd=python_cmd,
+            args=args,
     )
 
 
