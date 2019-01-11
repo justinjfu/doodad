@@ -1,7 +1,7 @@
 # doodad
 
 
-A library for launching python programs on different machines. Currently supports running locally and over EC2 and SSH (via Docker) with minimal (if any) modification to your existing program.
+A library for launching python programs on different machines. Currently supports running locally and over EC2, GCP and SSH (via Docker) with minimal (if any) modification to your existing program.
 
 EC2 code is based on [rllab](https://github.com/rll/rllab/)'s code.
 
