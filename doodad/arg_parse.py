@@ -9,7 +9,7 @@ CLOUDPICKLE_VERSION = 'DOODAD_CLOUDPICKLE_VERSION'
 
 
 __ARGS = None
-def __get_arg_config():
+def __get_unpickled_arg_config():
     """
     global __ARGS
     if __ARGS is not None:
@@ -34,7 +34,7 @@ def __get_arg_config():
 
 
 def get_args(key=None, default=None):
-    args = __get_arg_config()
+    args = __get_unpickled_arg_config()
 
     if args.args_data:
         if args.use_cloudpickle:
