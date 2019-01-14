@@ -43,12 +43,18 @@ class Sweeper(object):
 
 
 def chunker(sweeper, num_chunks=10):
+    import random
+    import math
     chunks = [ [] for _ in range(num_chunks) ]
     print('computing chunks')
-    for config in sweeper:
-        hash_ = int(hashlib.md5(repr(config).encode('utf-8')).hexdigest(), 16)
-        task_chunk = hash_ % num_chunks
-        chunks[task_chunk].append(config)
+    configs = [config for config in sweeper]
+    random.shuffle(configs)
+    for i, config in enumerate(configs):
+        chunks[i % num_chunks].append(config)
+    #for config in sweeper:
+    #    hash_ = int(hashlib.md5(repr(config).encode('utf-8')).hexdigest(), 16)
+    #    task_chunk = hash_ % num_chunks
+    #    chunks[task_chunk].append(config)
     print('num chunks:  ', num_chunks)
     print('chunk sizes: ', [len(chunk) for chunk in chunks])
     print('total jobs:  ', sum([len(chunk) for chunk in chunks]))

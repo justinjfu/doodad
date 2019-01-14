@@ -50,6 +50,7 @@ class DoodadSweeper(object):
     def run_test_docker(self, run_method, params, args=None, extra_mounts=None):
         if extra_mounts is None:
             extra_mounts = []
+        self.mode_local.async = False
         run_sweep_doodad(run_method, params, run_mode=self.mode_local,
                          python_cmd=self.python_cmd,
                          mounts=self.mounts+[self.mount_out_local]+extra_mounts,
@@ -147,8 +148,8 @@ class DoodadSweeper(object):
 
     def run_sweep_gcp_chunked(self, run_method, params, num_chunks, 
                       s3_log_name=None, add_date_to_logname=True,
-                      region='us-west1-a', instance_type='n1-standard-4', repeat=1, args=None,
-                      extra_mounts=None):
+                      region='us-west1-a', repeat=1, args=None,
+                      extra_mounts=None, **gcp_args):
         if extra_mounts is None:
             extra_mounts = []
         if s3_log_name is None:
@@ -161,10 +162,10 @@ class DoodadSweeper(object):
             image=self.image,
             zone=region,
             gcp_bucket_name=self.gcp_bucket_name,
-            instance_type=instance_type,
             gcp_log_prefix=s3_log_name,
             image_name=self.gcp_image,
             image_project=self.gcp_project,
+            **gcp_args,
         )
         run_sweep_doodad_chunked(run_method, params, run_mode=mode_ec2, num_chunks=num_chunks,
                 python_cmd=self.python_cmd,
@@ -173,8 +174,8 @@ class DoodadSweeper(object):
 
     def run_single_gcp(self, run_method, params, 
                       s3_log_name=None, add_date_to_logname=True,
-                      region='us-west1-a', instance_type='n1-standard-4', args=None,
-                      extra_mounts=None):
+                      region='us-west1-a', args=None,
+                      extra_mounts=None, **gcp_args):
         if extra_mounts is None:
             extra_mounts = []
         if s3_log_name is None:
@@ -187,10 +188,10 @@ class DoodadSweeper(object):
             image=self.image,
             zone=region,
             gcp_bucket_name=self.gcp_bucket_name,
-            instance_type=instance_type,
             gcp_log_prefix=s3_log_name,
             image_name=self.gcp_image,
             image_project=self.gcp_project,
+            **gcp_args,
         )
         run_single_doodad(run_method, params, run_mode=mode_ec2, 
                 python_cmd=self.python_cmd,
