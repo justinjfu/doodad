@@ -1,7 +1,7 @@
 # doodad
 
 
-A library for launching python programs on different machines. Currently supports running locally and over EC2 and SSH (via Docker) with minimal (if any) modification to your existing program.
+A library for launching python programs on different machines. Currently supports running locally and over EC2, GCP and SSH (via Docker) with minimal (if any) modification to your existing program.
 
 EC2 code is based on [rllab](https://github.com/rll/rllab/)'s code.
 
@@ -25,10 +25,7 @@ python scripts/ec2_setup.py
 
 - (Optional) Set up [Docker](https://docs.docker.com/engine/installation/). This is required on the target machine if running in a Docker-enabled mode.
 
-- (Optional) Set up GCP
-  - https://cloud.google.com/sdk/docs/quickstart-debian-ubuntu
-  - https://cloud.google.com/compute/docs/tutorials/python-guide
-  - https://cloud.google.com/storage/docs/reference/libraries#client-libraries-install-python
+- (Optional) Set up GCP (See [tutorial](https://github.com/justinjfu/doodad/wiki/How-to-use-Doodad#gcp-via-docker))
 
 
 ## Example
