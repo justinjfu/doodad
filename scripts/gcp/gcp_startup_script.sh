@@ -44,7 +44,9 @@ query_metadata() {
     done
     sudo apt-get install -y jq git unzip
     die() { status=$1; shift; echo "FATAL: $*"; exit $status; }
+    echo "starting docker!"
     service docker start
+    systemctl status docker.socket
     docker --config /home/ubuntu/.docker pull $docker_image
 
     num_local_mounts=$(jq length <<< $local_mounts)

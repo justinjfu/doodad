@@ -3,7 +3,7 @@ import subprocess
 import argparse
 
 def aws_sync(bucket_name, gs_log_dir, target_dir, exclude='*.pkl'):
-    cmd = 'gsutil -m cp -r gs://%s/doodad/logs/%s %s' % (bucket_name, gs_log_dir, target_dir)
+    cmd = 'gsutil -m rsync -r gs://%s/doodad/logs/%s %s' % (bucket_name, gs_log_dir, target_dir)
     subprocess.call(cmd, shell=True)
 
 def main():
