@@ -3,13 +3,15 @@ import tempfile
 import shutil
 import time
 import subprocess
+import uuid
 
 import doodad
-from doodad.launcher import cmd_util
+from doodad.darchive import cmd_util
 
 THIS_FILE_DIR = os.path.dirname(__file__)
 MAKESELF_PATH = os.path.join(THIS_FILE_DIR, 'makeself.sh')
 MAKESELF_HEADER_PATH = os.path.join(THIS_FILE_DIR, 'makeself-header.sh')
+BEGIN_HEADER = '--- BEGIN DAR OUTPUT ---'
 
 def build_archive(output_file, 
                   payload_script='',
@@ -40,6 +42,7 @@ def write_metadata(arch_dir):
     with open(os.path.join(arch_dir, 'METADATA'), 'w') as f:
         f.write('doodad_version=%s\n' % doodad.__version__)
         f.write('unix_timestamp=%d\n' % time.time())
+        f.write('uuid=%s\n' % uuid.uuid4())
 
 def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     runfile = os.path.join(arch_dir, 'run.sh')
@@ -51,6 +54,7 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     for mount in mounts:
         cmd_builder.append('echo', 'Mounting %s' % mount)
         cmd_builder.append(mount.dar_extract_command())
+    cmd_builder.append('echo', BEGIN_HEADER)
     cmd_builder.append(payload_script)
 
     with open(runfile, 'w') as f:
@@ -75,13 +79,19 @@ def compile_archive(archive_dir, output_file):
     subprocess.call(compile_cmd, shell=True)
     os.chmod(output_file, 0o777)
 
-def run_archive(filename):
+def run_archive(filename, encoding='utf-8', timeout=None):
     if '/' not in filename:
         filename = './'+filename
-    return subprocess.call([filename])
+    p = subprocess.Popen([filename], stdout=subprocess.PIPE)
+    output, errcode = p.communicate(timeout=timeout)
+    output = output.decode(encoding)
+    begin_output = output.find(BEGIN_HEADER, 0) + len(BEGIN_HEADER)
+    output = output[begin_output+1:]
+    # strip out 
+    return output, errcode
 
 if __name__ == "__main__":
-    import doodad.launcher.mount
+    import doodad.darchive.mount
     mnts = []
     mnts.append(doodad.launcher.mount.MountLocal(local_dir='./',
                                                 mount_point='./code/doodad2'))
