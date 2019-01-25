@@ -15,11 +15,11 @@ def call(cmd, verbose=False, dry=False, wait=True, shell=False):
             except OSError:
                 print("os error!")
                 pass
-            if wait:
-                p.wait()
+
 
 def call_and_get_output(cmd, shell=False, dry=False):
     if dry:
         print(cmd)
     else:
-        return subprocess.check_output(cmd, shell=True)
+        output, errors = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE)
+        return output

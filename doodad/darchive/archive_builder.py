@@ -37,7 +37,7 @@ def build_archive(archive_filename=None,
         write_metadata(archive_dir)
 
         # create the self-extracting archive
-        compile_archive(archive_dir, output_file)
+        compile_archive(archive_dir, archive_filename)
     finally:
         shutil.rmtree(work_dir)
     return archive_filename
@@ -83,11 +83,11 @@ def compile_archive(archive_dir, output_file):
     subprocess.call(compile_cmd, shell=True)
     os.chmod(output_file, 0o777)
 
-def run_archive(filename, encoding='utf-8', timeout=None):
+def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None):
     if '/' not in filename:
         filename = './'+filename
-    p = subprocess.Popen([filename], stdout=subprocess.PIPE)
-    output, errcode = p.communicate(timeout=timeout)
+    p = subprocess.Popen([shell_interpreter, filename], stdout=subprocess.PIPE)
+    output, errcode = p.communicate()
     output = output.decode(encoding)
     begin_output = output.find(BEGIN_HEADER, 0) + len(BEGIN_HEADER)
     output = output[begin_output+1:]

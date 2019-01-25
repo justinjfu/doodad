@@ -20,7 +20,7 @@ class TestArchiveBuilder(unittest.TestCase):
         ))
 
         payload_script = cmd_util.CommandBuilder()
-        payload_script.append('python', './code/doodad/test/hello_world.py')
+        payload_script.append('python3', './code/doodad/test/hello_world.py')
         
         archive = archive_builder.build_archive(payload_script=payload_script,
                                                 verbose=False, 
