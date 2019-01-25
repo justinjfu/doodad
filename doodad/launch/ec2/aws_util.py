@@ -26,8 +26,3 @@ def s3_upload(local_file_name, s3_bucket, s3_path, dry=False, region=None):
         subprocess.check_call(upload_cmd)
     return remote_path
 
-
-if __name__ == "__main__":
-    print(s3_exists('rail.ex2.a3c', 'jello/mount/tmp04cpn0zj.tar'))
-    print(s3_exists('rail.ex2.a3c', 'jello/mount/tmp04cpn0zj2.tar'))
-

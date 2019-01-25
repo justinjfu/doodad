@@ -13,11 +13,14 @@ MAKESELF_PATH = os.path.join(THIS_FILE_DIR, 'makeself.sh')
 MAKESELF_HEADER_PATH = os.path.join(THIS_FILE_DIR, 'makeself-header.sh')
 BEGIN_HEADER = '--- BEGIN DAR OUTPUT ---'
 
-def build_archive(output_file, 
+def build_archive(archive_filename=None, 
                   payload_script='',
                   launch_mode=None,
                   mounts=(),
                   verbose=False):
+    if archive_filename is None:
+        archive_filename = 'runfile.dar'
+
     # create a temporary work directory
     try:
         work_dir = tempfile.mkdtemp()
@@ -37,6 +40,7 @@ def build_archive(output_file,
         compile_archive(archive_dir, output_file)
     finally:
         shutil.rmtree(work_dir)
+    return archive_filename
 
 def write_metadata(arch_dir):
     with open(os.path.join(arch_dir, 'METADATA'), 'w') as f:

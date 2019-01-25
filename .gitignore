@@ -1,4 +1,5 @@
 aws_config/
+*.dar
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

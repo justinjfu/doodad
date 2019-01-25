@@ -22,10 +22,10 @@ class TestArchiveBuilder(unittest.TestCase):
         payload_script = cmd_util.CommandBuilder()
         payload_script.append('python', './code/doodad/test/hello_world.py')
         
-        archive_builder.build_archive('runfile.dar', 
-            payload_script=payload_script,
-            verbose=False, mounts=mnts)
-        output, errors = archive_builder.run_archive('runfile.dar', timeout=5)
+        archive = archive_builder.build_archive(payload_script=payload_script,
+                                                verbose=False, 
+                                                mounts=mnts)
+        output, errors = archive_builder.run_archive(archive, timeout=5)
         output = output.strip()
         self.assertEqual(output, 'hello world!')
 
