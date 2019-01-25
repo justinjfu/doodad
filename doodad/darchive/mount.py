@@ -131,15 +131,15 @@ class MountGit(Mount):
         with open(extract_file, 'w') as f:
             mount_point = os.path.dirname(self.mount_point)
             f.write('mkdir -p %s\n' % mount_point)
-            f.write('pushd %s\n' % mount_point)
+            f.write('pushd %s > /dev/null\n' % mount_point)
             if self.ssh_identity:
-                f.write("GIT_SSH_COMMAND='ssh -i {id}' git clone {repo_url}\n".format(id=self.ssh_identity, repo_url=self.git_url))
+                f.write("GIT_SSH_COMMAND='ssh -i {id}' git clone --quiet {repo_url}\n".format(id=self.ssh_identity, repo_url=self.git_url))
             else:
-                f.write("git clone {repo_url}\n".format(repo_url=self.git_url))
+                f.write("git clone --quiet {repo_url}\n".format(repo_url=self.git_url))
             if self.branch:
                 f.write('cd {repo_name}\n'.format(repo_name=self.repo_name))
-                f.write('git checkout {branch}\n'.format(branch=self.branch))
-            f.write('popd')
+                f.write('git checkout --quiet {branch}\n'.format(branch=self.branch))
+            f.write('popd > /dev/null')
         os.chmod(extract_file, 0o777)
 
     def dar_extract_command(self):

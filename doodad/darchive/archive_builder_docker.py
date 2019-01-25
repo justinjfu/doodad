@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import shutil
 import time
@@ -36,11 +37,11 @@ def build_archive(archive_filename=None,
         
         write_run_script(archive_dir, mounts, 
             payload_script=payload_script, verbose=verbose)  #TODO:depends on launch mode
-        write_docker_hook(archive_dir, docker_image, mounts)
+        write_docker_hook(archive_dir, docker_image, mounts, verbose=verbose)
         write_metadata(archive_dir)
 
         # create the self-extracting archive
-        compile_archive(archive_dir, archive_filename)
+        compile_archive(archive_dir, archive_filename, verbose=verbose)
     finally:
         shutil.rmtree(work_dir)
     return archive_filename
@@ -51,7 +52,7 @@ def write_metadata(arch_dir):
         f.write('unix_timestamp=%d\n' % time.time())
         f.write('uuid=%s\n' % uuid.uuid4())
 
-def write_docker_hook(arch_dir, image_name, mounts, verbose=True):
+def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
     docker_hook_file = os.path.join(arch_dir, 'docker.sh')
     cmd_builder = cmd_util.CommandBuilder()
     cmd_builder.append('#!/bin/bash')
@@ -75,13 +76,17 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     runfile = os.path.join(arch_dir, 'run.sh')
     cmd_builder = cmd_util.CommandBuilder()
     cmd_builder.append('#!/bin/bash')
-    cmd_builder.echo('Running Doodad Archive [DAR] $1')
-    cmd_builder.echo('DAR build information:')
-    cmd_builder.append('cat', './METADATA')
+    if verbose:
+        cmd_builder.echo('Running Doodad Archive [DAR] $1')
+        cmd_builder.echo('DAR build information:')
+        cmd_builder.append('cat', './METADATA')
+
     for mount in mounts:
-        cmd_builder.append('echo', 'Mounting %s' % mount)
+        if verbose:
+            cmd_builder.append('echo', 'Mounting %s' % mount)
         cmd_builder.append(mount.dar_extract_command())
-    cmd_builder.append('echo', BEGIN_HEADER)
+    if verbose:
+        cmd_builder.append('echo', BEGIN_HEADER)
     cmd_builder.append(payload_script)
 
     with open(runfile, 'w') as f:
@@ -93,8 +98,8 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
             print(f.read())
     os.chmod(runfile, 0o777)
 
-def compile_archive(archive_dir, output_file):
-    compile_cmd = "{mkspath} --header {mkhpath} {archive_dir} {output_file} {name} {run_script}"
+def compile_archive(archive_dir, output_file, verbose=False):
+    compile_cmd = "{mkspath} --nocrc --nomd5 --header {mkhpath} {archive_dir} {output_file} {name} {run_script}"
     compile_cmd = compile_cmd.format(
         mkspath=MAKESELF_PATH,
         mkhpath=MAKESELF_HEADER_PATH,
@@ -103,13 +108,18 @@ def compile_archive(archive_dir, output_file):
         output_file=output_file,
         run_script='./docker.sh'
     )
-    subprocess.call(compile_cmd, shell=True)
+    if verbose:
+        pipe = sys.stdout
+    else:
+        pipe = subprocess.PIPE
+    p = subprocess.Popen(compile_cmd, shell=True, stdout=pipe, stderr=pipe)
+    p.wait()
     os.chmod(output_file, 0o777)
 
 def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None):
     if '/' not in filename:
         filename = './'+filename
-    p = subprocess.Popen([shell_interpreter, filename], stdout=subprocess.PIPE)
+    p = subprocess.Popen([shell_interpreter, filename, '--quiet'], stdout=subprocess.PIPE)
     output, errcode = p.communicate()
     output = _strip_stdout(output.decode(encoding))
     # strip out 
@@ -117,7 +127,9 @@ def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None
 
 
 def _strip_stdout(output):
-    begin_output = output.find(BEGIN_HEADER, 0) + len(BEGIN_HEADER)
+    begin_output = output.find(BEGIN_HEADER, 0) 
+    if begin_output >= 0:
+        begin_output += len(BEGIN_HEADER)
     output = output[begin_output+1:]
     return output
 

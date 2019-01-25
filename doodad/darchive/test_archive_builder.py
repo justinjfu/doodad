@@ -46,8 +46,9 @@ class TestDockerArchiveBuilder(unittest.TestCase):
                                                 verbose=False, 
                                                 docker_image='python:3',
                                                 mounts=mnts)
-        output, errors = archive_builder.run_archive(archive, timeout=5)
+        output, errors = archive_builder_docker.run_archive(archive, timeout=5)
         output = output.strip()
+        print(output)
         self.assertEqual(output, 'hello world!')
 
 if __name__ == '__main__':
