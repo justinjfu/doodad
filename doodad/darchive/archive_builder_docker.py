@@ -111,11 +111,15 @@ def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None
         filename = './'+filename
     p = subprocess.Popen([shell_interpreter, filename], stdout=subprocess.PIPE)
     output, errcode = p.communicate()
-    output = output.decode(encoding)
-    begin_output = output.find(BEGIN_HEADER, 0) + len(BEGIN_HEADER)
-    output = output[begin_output+1:]
+    output = _strip_stdout(output.decode(encoding))
     # strip out 
     return output, errcode
+
+
+def _strip_stdout(output):
+    begin_output = output.find(BEGIN_HEADER, 0) + len(BEGIN_HEADER)
+    output = output[begin_output+1:]
+    return output
 
 if __name__ == "__main__":
     import doodad.darchive.mount

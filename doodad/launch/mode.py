@@ -19,7 +19,8 @@ class LaunchMode(object):
         Runs a shell script.
         """
         if return_output:
-            return shell.call_and_get_output(self.get_run_command(script_filename), shell=True, dry=dry)
+            output = shell.call_and_get_output(self.get_run_command(script_filename), shell=True, dry=dry)
+            return output.decode('utf-8')
         else:
             shell.call(self.get_run_command(script_filename), shell=True, dry=dry, wait=not self.async_run)
 
@@ -44,30 +45,7 @@ class SSHMode(LaunchMode):
         return self.ssh_cred.get_ssh_script_cmd(script_filename)
 
 
-class DockerMode(LaunchMode):
-    def __init__(self, 
-                 docker_image='scratch',
-                 docker_cmd='docker',
-                 **kwargs):
-        super(DockerMode, self).__init__(**kwargs)
-        self.docker_image = docker_image
-        self.docker_cmd = docker_cmd
-
-    def _get_docker_cmd(self, script):
-        docker_cmd = '{docker_cmd} run -i {docker_img} /bin/{sh} -s < {script}'
-        docker_cmd = docker_cmd.format(
-            docker_cmd=self.docker_cmd,
-            docker_img=self.docker_image,
-            sh=self.shell_interpreter,
-            script=script
-        )
-        return docker_cmd
-    
-    def get_run_command(self, script):
-        return self._get_docker_cmd(script)
-
-
-class GCPDockerMode(DockerMode):
+class GCPMode(LaunchMode):
     def __init__(self, 
                  gcp_project,
                  gce_log_mount,
@@ -80,7 +58,7 @@ class GCPDockerMode(DockerMode):
                  instance_type='n1-standard-1',
                  log_prefix='gcp_experiment',
                  **kwargs):
-        super(GCPDockerMode, self).__init__(**kwargs)
+        super(GCPMode, self).__init__(**kwargs)
         self.gcp_project = gcp_project
         assert isinstance(gce_log_mount, mount.MountGCP)
         self.gce_log_mount = gce_log_mount
@@ -100,11 +78,10 @@ class GCPDockerMode(DockerMode):
         exp_name = "{}-{}".format(self.gcp_log_prefix, gcp_util.make_timekey())
         exp_prefix = self.gcp_log_prefix
 
-        docker_cmd = self._get_docker_cmd(script)
+        run_cmd = self.get_run_command(script)
         metadata = {
             'bucket_name': self.gce_log_mount.gcp_bucket,
-            'docker_cmd': docker_cmd,
-            'docker_image': self.docker_image,
+            'docker_cmd': run_cmd,
             'terminate': json.dumps(self.terminate_on_end),
             'startup-script': open(gcp_util.GCP_STARTUP_SCRIPT_PATH, "r").read(),
             'shutdown-script': open(gcp_util.GCP_SHUTDOWN_SCRIPT_PATH, "r").read(),
@@ -161,3 +138,6 @@ class GCPDockerMode(DockerMode):
             zone=self.zone,
             body=config
         ).execute()
+
+    def get_run_command(self, script_filename):
+        return '%s %s' % (self.shell_interpreter, script_filename)
