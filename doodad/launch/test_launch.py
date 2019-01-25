@@ -18,7 +18,8 @@ class TestLocalMode(unittest.TestCase):
     def test_hello(self):
         launcher = mode.LocalMode()
         with hello_script() as script_name:
-            launcher.run_script(script_name)
+            output = launcher.run_script(script_name, return_output=True)
+            self.assertEqual(output, 'hello123\n')
 
 
 class TestDockerMode(unittest.TestCase):
@@ -35,7 +36,8 @@ class TestDockerMode(unittest.TestCase):
 
     def test_hello(self):
         with hello_script() as script_name:
-            self.launcher.run_script(script_name)
+            output = self.launcher.run_script(script_name, return_output=True)
+            self.assertEqual(output, 'hello123\n')
 
 
 if __name__ == '__main__':

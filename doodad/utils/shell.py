@@ -21,5 +21,6 @@ def call_and_get_output(cmd, shell=False, dry=False):
     if dry:
         print(cmd)
     else:
-        output, errors = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE)
+        p = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE)
+        output, errors = p.communicate()
         return output
