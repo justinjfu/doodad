@@ -31,7 +31,7 @@ class TestDockerMode(unittest.TestCase):
         launcher = mode.DockerMode(docker_image=self.img,
                                         docker_cmd='nvidia-docker')
         cmd = launcher._get_docker_cmd('foo')
-        self.assertTrue(cmd.startswith('nvidia-docker run %s' % self.img))
+        self.assertTrue(cmd.startswith('nvidia-docker run -i %s' % self.img))
 
     def test_hello(self):
         with hello_script() as script_name:

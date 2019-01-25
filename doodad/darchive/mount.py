@@ -12,7 +12,7 @@ import tarfile
 import tempfile
 from contextlib import contextmanager
 
-from doodad.ec2 import aws_util
+from doodad.launch.ec2 import aws_util
 from doodad import utils 
 
 

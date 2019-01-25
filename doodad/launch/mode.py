@@ -43,7 +43,7 @@ class DockerMode(LaunchMode):
         self.docker_cmd = docker_cmd
 
     def _get_docker_cmd(self, script):
-        docker_cmd = '{docker_cmd} run {docker_img} -i /bin/{sh} -s < {script}'
+        docker_cmd = '{docker_cmd} run -i {docker_img} /bin/{sh} -s < {script}'
         docker_cmd = docker_cmd.format(
             docker_cmd=self.docker_cmd,
             docker_img=self.docker_image,
