@@ -24,6 +24,14 @@ def _get_module(filename, os_path=False):
             return os
 
 
+def resolve_modules(mod1, mod2):
+    if mod1 == os or mod1 == os.path:
+        return mod2
+    if mod2 == os or mod2 == os.path:
+        return mod1
+    raise ValueError('Incompatible modules %s, %s' % (mod1, mod2))
+
+
 def open(filename, mode='r', **kwargs):
     """
 
@@ -75,6 +83,16 @@ def remove(path):
     """
     module = _get_module(path)
     return module.remove(path)
+
+
+def copy(src, dst):
+    """
+    Copy src to dst
+    """
+    module_src = _get_module(src)
+    module_dst = _get_module(src)
+    module = resolve_modules(module_src, module_dst)
+    return module.copy(src, dst)
 
 
 def exists(path):

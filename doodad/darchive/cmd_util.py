@@ -9,6 +9,8 @@ class CommandBuilder(object):
         else:
             self.cmds.append(cmd)
 
+    def echo(self, msg):
+        self.append('echo', msg)
 
     def to_string(self, separator=';'):
         return ';'.join([str(cmd) for cmd in self])

@@ -38,6 +38,10 @@ class Mount(object):
         raise NotImplementedError()
 
     @property
+    def writeable(self):
+        return not self.read_only
+
+    @property
     def name(self):
         return self._name
 
@@ -62,6 +66,7 @@ class Mount(object):
                 tar.add(self.local_dir, arcname=os.path.basename(self.local_dir), filter=filter_func)
             tf.seek(0)
             yield tf.name
+
 
 class MountLocal(Mount):
     def __init__(self, local_dir, mount_point=None, cleanup=True,
