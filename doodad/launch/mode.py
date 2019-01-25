@@ -42,12 +42,15 @@ class DockerMode(LaunchMode):
         self.docker_image = docker_image
         self.docker_cmd = docker_cmd
 
-    def run_script(self, script_filename):
+    def _get_docker_cmd(self, script):
         docker_cmd = '{docker_cmd} run {docker_img} -i /bin/{sh} -s < {script}'
-        docker_cmd.format(
+        docker_cmd = docker_cmd.format(
             docker_cmd=self.docker_cmd,
-            docker_image=self.docker_image,
+            docker_img=self.docker_image,
             sh=self.shell_interpreter,
-            script=script_filename
+            script=script
         )
-        shell.call(docker_cmd, shell=True, wait=True)
+        return docker_cmd
+
+    def run_script(self, script_filename):
+        shell.call(self._get_docker_cmd(script_filename), shell=True, wait=True)

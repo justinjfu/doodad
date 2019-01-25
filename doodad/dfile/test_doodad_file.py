@@ -12,7 +12,7 @@ class TestDFileOpen(unittest.TestCase):
             self.assertIsInstance(f, s3_file.S3File)
 
     def test_ssh(self):
-        with dfile.open(r'ssh://user@hostname.org:~/test_file.txt', mode='r') as f:
+        with dfile.open(r'ssh://user@hostname.org:~/test_file.txt', mode='w') as f:
             self.assertIsInstance(f, ssh_file.SSHFile)
             self.assertEqual(f.username, 'user')
             self.assertEqual(f.hostname, 'hostname.org')

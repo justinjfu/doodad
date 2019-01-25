@@ -22,10 +22,20 @@ class TestLocalMode(unittest.TestCase):
 
 
 class TestDockerMode(unittest.TestCase):
+    def setUp(self):
+        self.img = 'ubuntu:18.04'
+        self.launcher = mode.DockerMode(docker_image=self.img,
+                                        docker_cmd='docker')
+
+    def test_docker_cmd(self):
+        launcher = mode.DockerMode(docker_image=self.img,
+                                        docker_cmd='nvidia-docker')
+        cmd = launcher._get_docker_cmd('foo')
+        self.assertTrue(cmd.startswith('nvidia-docker run %s' % self.img))
+
     def test_hello(self):
-        launcher = mode.DockerMode(docker_image='ubuntu:18.04')
         with hello_script() as script_name:
-            launcher.run_script(script_name)
+            self.launcher.run_script(script_name)
 
 
 if __name__ == '__main__':
