@@ -12,7 +12,7 @@ import tarfile
 import tempfile
 from contextlib import contextmanager
 
-from doodad.launch.ec2 import aws_util
+from doodad.apis import aws_util
 from doodad import utils 
 
 
@@ -261,3 +261,28 @@ class MountS3(Mount):
         return './deps/s3/{name}/extract.sh'.format(
             name=self.name,
         )
+
+
+class MountGCP(Mount):
+    def __init__(self, 
+                zone,
+                gcp_bucket,
+                gcp_path, 
+                local_dir=None,
+                sync_interval=15, 
+                output=False,
+                include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), 
+                **kwargs):
+        super(MountGCP, self).__init__(output=output, **kwargs)
+        # load from config
+        self.gcp_bucket = gcp_bucket
+        self.gcp_path = gcp_path
+        self.zone = zone
+        self.output = output
+        self.sync_interval = sync_interval
+        self.sync_on_terminate = True
+        self.include_types = include_types
+        self.__name = '%s.%s' % (self.gcp_bucket, self.gcp_path.replace('/', '.'))
+        if output is False:
+            assert local_dir is not None
+            self.local_dir = os.path.realpath(os.path.expanduser(local_dir))

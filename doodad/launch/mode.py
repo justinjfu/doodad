@@ -1,4 +1,13 @@
+import json
+import uuid
+
 from doodad.utils import shell
+from doodad.utils import safe_import
+from doodad.darchive import mount
+
+googleapiclient = safe_import.try_import('googleapiclient')
+from doodad.apis import gcp_util 
+
 
 class LaunchMode(object):
     def __init__(self, shell_interpreter='sh', async_run=False):
@@ -56,3 +65,99 @@ class DockerMode(LaunchMode):
     
     def get_run_command(self, script):
         return self._get_docker_cmd(script)
+
+
+class GCPDockerMode(DockerMode):
+    def __init__(self, 
+                 gcp_project,
+                 gce_log_mount,
+                 gce_image='ubuntu-1804-bionic-v20181222',
+                 gce_image_project='ubuntu-os-cloud',
+                 disk_size='64Gb',
+                 terminate_on_end=True,
+                 preemptible=True,
+                 zone='us-west1-a',
+                 instance_type='n1-standard-1',
+                 log_prefix='gcp_experiment',
+                 **kwargs):
+        super(GCPDockerMode, self).__init__(**kwargs)
+        self.gcp_project = gcp_project
+        assert isinstance(gce_log_mount, mount.MountGCP)
+        self.gce_log_mount = gce_log_mount
+        self.gcp_log_prefix = log_prefix
+        self.gce_image = gce_image
+        self.gce_image_project = gce_image_project
+        self.disk_size = disk_size
+        self.terminate_on_end = terminate_on_end
+        self.preemptible = preemptible
+        self.zone = zone
+        self.instance_type = instance_type
+        self.compute = googleapiclient.discovery.build('compute', 'v1')
+
+    def run_script(self, script, dry=False, return_output=False):
+        if return_output:
+            raise NotImplementedError()
+        exp_name = "{}-{}".format(self.gcp_log_prefix, gcp_util.make_timekey())
+        exp_prefix = self.gcp_log_prefix
+
+        docker_cmd = self._get_docker_cmd(script)
+        metadata = {
+            'bucket_name': self.gce_log_mount.gcp_bucket,
+            'docker_cmd': docker_cmd,
+            'docker_image': self.docker_image,
+            'terminate': json.dumps(self.terminate_on_end),
+            'startup-script': open(gcp_util.GCP_STARTUP_SCRIPT_PATH, "r").read(),
+            'shutdown-script': open(gcp_util.GCP_SHUTDOWN_SCRIPT_PATH, "r").read(),
+        }
+        # instance name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'">
+        unique_name= "doodad" + str(uuid.uuid4()).replace("-", "")
+        self.create_instance(metadata, unique_name, exp_name, exp_prefix)
+
+    def create_instance(self, metadata, name, exp_name="", exp_prefix=""):
+        image_response = self.compute.images().get(
+            project=self.gce_image_project,
+            image=self.gce_image,
+        ).execute()
+        source_disk_image = image_response['selfLink']
+        config = {
+            'name': name,
+            'machineType': gcp_util.get_machine_type(self.zone, self.instance_type),
+            'disks': [{
+                    'boot': True,
+                    'autoDelete': True,
+                    'initializeParams': {
+                        'sourceImage': source_disk_image,
+                        'diskSizeGb': self.disk_size,
+                    }
+            }],
+            'networkInterfaces': [{
+                'network': 'global/networks/default',
+                'accessConfigs': [
+                    {'type': 'ONE_TO_ONE_NAT', 'name': 'External NAT'}
+                ]
+            }],
+            'serviceAccounts': [{
+                'email': 'default',
+                'scopes': ['https://www.googleapis.com/auth/cloud-platform']
+            }],
+            'metadata': {
+                'items': [
+                    {'key': key, 'value': value}
+                    for key, value in metadata.items()
+                ]
+            },
+            'scheduling': {
+                "onHostMaintenance": "terminate",
+                "automaticRestart": False,
+                "preemptible": self.preemptible,
+            },
+            "labels": {
+                "exp_name": exp_name,
+                "exp_prefix": exp_prefix,
+            }
+        }
+        return self.compute.instances().insert(
+            project=self.gcp_project,
+            zone=self.zone,
+            body=config
+        ).execute()
