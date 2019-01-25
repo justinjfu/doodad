@@ -18,7 +18,13 @@ class TestLocalMode(unittest.TestCase):
     def test_hello(self):
         launcher = mode.LocalMode()
         with hello_script() as script_name:
-            print(script_name)
+            launcher.run_script(script_name)
+
+
+class TestDockerMode(unittest.TestCase):
+    def test_hello(self):
+        launcher = mode.DockerMode(docker_image='ubuntu:18.04')
+        with hello_script() as script_name:
             launcher.run_script(script_name)
 
 

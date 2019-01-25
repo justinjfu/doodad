@@ -11,6 +11,7 @@ class TestOS(unittest.TestCase):
         ssh_credentials.set_identity_file(os.path.join('~/.ssh/rail_newton'))
         self.prefix = 'ssh://justinfu@newton4.banatao.berkeley.edu:'
 
+    """
     def test_mkdir(self):
         ssh_file.mkdir(self.prefix+'~/tmp_dir_test')
 
@@ -26,6 +27,7 @@ class TestOS(unittest.TestCase):
         self.assertTrue(exists)
         exists = ssh_file.exists(self.prefix + '~/non_existent_file')
         self.assertFalse(exists)
+    """
 
 
 if __name__ == '__main__':
