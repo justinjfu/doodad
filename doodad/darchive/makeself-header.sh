@@ -94,7 +94,7 @@ MS_dd()
 
 MS_dd_Progress()
 {
-    if test x"\$noprogress" = xy; then
+    if test x"\$progress" = xn; then
         MS_dd "\$@"
         return \$?
     fi
@@ -156,7 +156,7 @@ MS_Help()
   --noexec              Do not run embedded script
   --keep                Do not erase target directory after running
                         the embedded script
-  --noprogress          Do not show the progress during the decompression
+  --progress            Show the progress during the decompression
   --nox11               Do not spawn an xterm
   --nochown             Do not give the extracted files to the current user
   --nodiskspace         Do not check for available disk space
@@ -272,7 +272,7 @@ UnTAR()
 
 finish=true
 xterm_loop=
-noprogress=$NOPROGRESS
+progress=$PROGRESS
 nox11=$NOX11
 copy=$COPY
 ownership=y
@@ -289,7 +289,7 @@ do
 	;;
     -q | --quiet)
 	quiet=y
-	noprogress=y
+	progress=n
 	shift
 	;;
 	--accept)
@@ -390,8 +390,8 @@ EOLSM
 	targetdir="\${2:-.}"
     if ! shift 2; then MS_Help; exit 1; fi
 	;;
-    --noprogress)
-	noprogress=y
+    --progress)
+	progress=y
 	shift
 	;;
     --nox11)

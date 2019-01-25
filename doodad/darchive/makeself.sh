@@ -180,7 +180,7 @@ APPEND=n
 TAR_QUIETLY=n
 KEEP_UMASK=n
 QUIET=n
-NOPROGRESS=n
+PROGRESS=n
 COPY=none
 NEED_ROOT=n
 TAR_ARGS=cvf
@@ -324,8 +324,8 @@ do
 	DU_ARGS=-ksL
 	shift
 	;;
-    --noprogress)
-	NOPROGRESS=y
+    --progress)
+	PROGRESS=n
 	shift
 	;;
     --nox11)
