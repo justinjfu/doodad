@@ -1,5 +1,9 @@
 # doodad
 
+[![Build Status](https://travis-ci.com/justinjfu/doodad.svg?branch=master)](https://travis-ci.com/justinjfu/doodad)
+[![codecov](https://codecov.io/gh/justinjfu/doodad/branch/master/graph/badge.svg)](https://codecov.io/gh/justinjfu/doodad)
+
+
 A library for packaging dependencies and launching scripts (with a focus on python) on different platforms using Docker.
 Currently supported platforms include EC2, GCP, and remotely via SSH.
 
