@@ -71,7 +71,7 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         """
         mnts = []
         mnts.append(mount.MountGCP(
-            local_dir='test_dir',
+            gcp_path='test_dir',
             dry=True,
         ))
         payload_script = 'echo hello123'

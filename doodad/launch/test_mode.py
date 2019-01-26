@@ -23,5 +23,5 @@ class TestSSH(unittest.TestCase):
         launcher = mode.SSHMode(credentials, shell_interpreter='bashy')
         self.assertEqual(
             launcher._get_run_command('myscript.sh'),
-            'ssh a@b.com -s \'bashy -s \' < myscript.sh'
+            'ssh a@b.com \'bashy -s\' < myscript.sh'
         )

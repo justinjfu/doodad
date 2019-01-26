@@ -35,11 +35,9 @@ class SSHCredentials(object):
         prefix = self.get_ssh_cmd_prefix()
         return prefix + " '%s'"%cmd
 
-    def get_ssh_script_cmd(self, script_name):
-        cmd = 'ssh %s@%s' % (self.username, self.hostname)
-        if self.identity_file:
-            cmd += ' -i %s' % self.identity_file
-        cmd += " 'bash -s' < %s" % script_name
+    def get_ssh_script_cmd(self, script_name, shell_interpreter='bash'):
+        cmd = self.get_ssh_cmd_prefix()
+        cmd += "'%s -s' < %s" % (shell_interpreter, script_name)
         return cmd
 
     def get_scp_cmd(self, source, destination, src_remote=True, recursive=True):

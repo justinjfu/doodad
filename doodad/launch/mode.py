@@ -59,7 +59,8 @@ class SSHMode(LaunchMode):
         self.ssh_cred = ssh_credentials
 
     def _get_run_command(self, script_filename):
-        return self.ssh_cred.get_ssh_script_cmd(script_filename)
+        return self.ssh_cred.get_ssh_script_cmd(script_filename, 
+                                                shell_interpreter=self.shell_interpreter)
 
 
 class GCPMode(LaunchMode):
