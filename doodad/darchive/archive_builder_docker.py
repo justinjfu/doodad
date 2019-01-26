@@ -85,10 +85,6 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
     ))
     with open(docker_hook_file, 'w') as f:
         f.write(builder.dump_script())
-    if verbose:
-        print('[VERBOSE] Docker script:')
-        with open(docker_hook_file) as f:
-            print(f.read())
     os.chmod(docker_hook_file, 0o777)
 
 def write_run_script(arch_dir, mounts, payload_script, verbose=False):
@@ -111,10 +107,6 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     with open(runfile, 'w') as f:
         f.write(builder.dump_script())
 
-    if verbose:
-        print('[VERBOSE] Run script:')
-        with open(runfile) as f:
-            print(f.read())
     os.chmod(runfile, 0o777)
 
 def compile_archive(archive_dir, output_file, verbose=False):
@@ -127,10 +119,7 @@ def compile_archive(archive_dir, output_file, verbose=False):
         output_file=output_file,
         run_script='./docker.sh'
     )
-    if verbose:
-        pipe = sys.stdout
-    else:
-        pipe = subprocess.PIPE
+    pipe = subprocess.PIPE
     p = subprocess.Popen(compile_cmd, shell=True, stdout=pipe, stderr=pipe)
     p.wait()
     os.chmod(output_file, 0o777)

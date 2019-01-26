@@ -156,6 +156,7 @@ class MountS3(Mount):
                 local_dir=None,
                 sync_interval=15, 
                 output=False,
+                dry=False,
                 include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), 
                 **kwargs):
         super(MountS3, self).__init__(output=output, **kwargs)
@@ -166,8 +167,9 @@ class MountS3(Mount):
         self.output = output
         self.sync_interval = sync_interval
         self.sync_on_terminate = True
+        self.dry = dry
         self.include_types = include_types
-        self.__name = '%s.%s' % (self.s3_bucket, self.s3_path.replace('/', '.'))
+        self._name = '%s.%s' % (self.s3_bucket, self.s3_path.replace('/', '.'))
         if output is False:
             assert local_dir is not None
             self.local_dir = os.path.realpath(os.path.expanduser(local_dir))
@@ -183,7 +185,7 @@ class MountS3(Mount):
         if remote_filename is None:
             remote_filename = os.path.basename(filename)
         remote_path = 'doodad/mount/'+remote_filename
-        if check_exist:
+        if check_exist and not dry:
             if aws_util.s3_exists(self.s3_bucket, remote_path, region=self.region):
                 print('\t%s exists! ' % os.path.join(self.s3_bucket, remote_path))
                 return 's3://'+os.path.join(self.s3_bucket, remote_path)
@@ -245,7 +247,7 @@ class MountS3(Mount):
             with self.gzip() as gzip_file:
                 gzip_path = os.path.realpath(gzip_file)
                 file_hash = utils.hash_file(gzip_path)
-                s3_path = self.s3_upload(gzip_path, remote_filename=file_hash+'.tar')
+                s3_path = self.s3_upload(gzip_path, remote_filename=file_hash+'.tar', dry=self.dry)
             self.path_on_remote = s3_path
             self.local_file_hash = gzip_path
 
@@ -274,8 +276,9 @@ class MountGCP(Mount):
                 gcp_path, 
                 local_dir=None,
                 sync_interval=15, 
-                output=False,
-                include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), 
+                output=True,
+                dry=False,
+                exclude_regex='*.tmp',
                 **kwargs):
         super(MountGCP, self).__init__(output=output, **kwargs)
         # load from config
@@ -285,8 +288,38 @@ class MountGCP(Mount):
         self.output = output
         self.sync_interval = sync_interval
         self.sync_on_terminate = True
-        self.include_types = include_types
-        self.__name = '%s.%s' % (self.gcp_bucket, self.gcp_path.replace('/', '.'))
-        if output is False:
-            assert local_dir is not None
-            self.local_dir = os.path.realpath(os.path.expanduser(local_dir))
+        self.exclude_string = '"'+exclude_regex+'"'
+        self._name = '%s.%s' % (self.gcp_bucket, self.gcp_path.replace('/', '.'))
+        self.dry = dry
+        assert output
+
+    def dar_build_archive(self, deps_dir):
+        dep_dir = os.path.join(deps_dir, 'gcp', self.name)
+        os.makedirs(dep_dir)
+        extract_file = os.path.join(dep_dir, 'extract.sh')
+
+        with open(extract_file, 'w') as f:
+            # f.write("mkdir -p {local_code_path}\n".format(local_code_path=mount_point))
+            f.write("mkdir -p {remote_dir}\n".format(
+                remote_dir=self.mount_point)
+            )
+            # Sync interval
+            f.write("""
+            while /bin/true; do
+                gsutil -m rsync -x {exclude_string} -r {log_dir} gs://{gcp_bucket}/{gcp_path}
+                sleep {periodic_sync_interval}
+            done & echo sync from {log_dir} to gs://{gcp_bucket}/{gcp_path} initiated
+            """.format(
+                exclude_string=self.exclude_string,
+                log_dir=self.mount_point,
+                gcp_bucket=self.gcp_bucket,
+                gcp_path=self.gcp_path,
+                periodic_sync_interval=self.sync_interval
+            ))
+        os.chmod(extract_file, 0o777)
+
+    def dar_extract_command(self):
+        # execute the script to pull from S3
+        return './deps/gcp/{name}/extract.sh'.format(
+            name=self.name,
+        )

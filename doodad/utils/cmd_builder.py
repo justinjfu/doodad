@@ -3,11 +3,11 @@ class CommandBuilder(object):
     def __init__(self):
         self.cmds = []
 
-    def append(self, cmd, args=None):
+    def append(self, cmd, *args):
         if args:
-            self.cmds.append(cmd + ' ' + args)
-        else:
-            self.cmds.append(cmd)
+            cmd = (cmd,) + args
+            cmd = ' '.join(cmd)
+        self.cmds.append(cmd)
 
     def echo(self, msg):
         self.append('echo', msg)
@@ -27,4 +27,5 @@ class CommandBuilder(object):
                 yield cmd
 
     def dump_script(self):
+        #return self.to_string(separator='\n')
         return '\n'.join(list(self))

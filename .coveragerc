@@ -1,2 +1,3 @@
 [run]
 source=doodad/
+omit = */test*.py

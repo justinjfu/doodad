@@ -1,6 +1,9 @@
 import subprocess
 
 def call(cmd, verbose=False, dry=False, wait=True, shell=False):
+    """
+    Returns 0 on success, 1/2 on failure
+    """
     if dry or verbose:
         print(cmd)
     if not dry:
@@ -8,6 +11,7 @@ def call(cmd, verbose=False, dry=False, wait=True, shell=False):
         try:
             if wait:
                 p.wait()
+            return p.returncode
         except KeyboardInterrupt:
             try:
                 print("terminating")
@@ -15,6 +19,7 @@ def call(cmd, verbose=False, dry=False, wait=True, shell=False):
             except OSError:
                 print("os error!")
                 pass
+            return 1
 
 
 def call_and_get_output(cmd, shell=False, dry=False):

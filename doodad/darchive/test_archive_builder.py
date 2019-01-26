@@ -46,5 +46,50 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         output = output.strip()
         self.assertEqual(output, 'apple')
 
+    def test_s3(self):
+        """ This test doesn't actually run things it just makes sure nothing errors.
+        (we don't actually want to launch a test on EC2 and spend money) 
+        """
+        mnts = []
+        mnts.append(mount.MountS3(
+            region='us-west1',
+            s3_bucket='my.bucket',
+            s3_path='logs/mylogs',
+            local_dir=TESTING_DIR,
+            dry=True,
+        ))
+        payload_script = 'echo hello123'
+        archive = archive_builder_docker.build_archive(payload_script=payload_script,
+                                                verbose=False, 
+                                                docker_image='python:3',
+                                                mounts=mnts)
+
+    def test_gcp(self):
+        """ This test doesn't actually run things it just makes sure nothing errors.
+        (we don't actually want to launch a test on EC2 and spend money) 
+        """
+        mnts = []
+        mnts.append(mount.MountGCP(
+            zone='us-west1',
+            gcp_bucket='my.bucket',
+            gcp_path='logs/mylogs',
+            local_dir=TESTING_DIR,
+            dry=True,
+        ))
+        payload_script = 'echo hello123'
+        archive = archive_builder_docker.build_archive(payload_script=payload_script,
+                                                verbose=False, 
+                                                docker_image='python:3',
+                                                mounts=mnts)
+
+    def test_verbose(self):
+        payload_script = 'echo hello123'
+        archive = archive_builder_docker.build_archive(payload_script=payload_script,
+                                                verbose=True, 
+                                                docker_image='python:3')
+        output, errors = archive_builder_docker.run_archive(archive, timeout=5)
+        output = output.strip()
+        self.assertEqual(output, 'hello123')
+
 if __name__ == '__main__':
     unittest.main()
