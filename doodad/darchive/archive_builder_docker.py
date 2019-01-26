@@ -17,7 +17,8 @@ import uuid
 import contextlib
 
 import doodad
-from doodad.darchive import cmd_util, mount
+from doodad.darchive import mount
+from doodad.utils import cmd_builder
 
 THIS_FILE_DIR = os.path.dirname(__file__)
 MAKESELF_PATH = os.path.join(THIS_FILE_DIR, 'makeself.sh')
@@ -72,18 +73,18 @@ def write_metadata(arch_dir):
 
 def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
     docker_hook_file = os.path.join(arch_dir, 'docker.sh')
-    cmd_builder = cmd_util.CommandBuilder()
-    cmd_builder.append('#!/bin/bash')
+    builder = cmd_builder.CommandBuilder()
+    builder.append('#!/bin/bash')
     mnt_cmd = ''.join([' -v %s:%s' % (mnt.local_dir, mnt.mount_point) 
         for mnt in mounts if isinstance(mnt, mount.MountLocal) and mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/payload'
-    cmd_builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /payload;./run.sh"'.format(
+    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /payload;./run.sh"'.format(
         img=image_name,
         mount_cmds=mnt_cmd,
     ))
     with open(docker_hook_file, 'w') as f:
-        f.write(cmd_builder.dump_script())
+        f.write(builder.dump_script())
     if verbose:
         print('[VERBOSE] Docker script:')
         with open(docker_hook_file) as f:
@@ -92,23 +93,23 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
 
 def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     runfile = os.path.join(arch_dir, 'run.sh')
-    cmd_builder = cmd_util.CommandBuilder()
-    cmd_builder.append('#!/bin/bash')
+    builder = cmd_builder.CommandBuilder()
+    builder.append('#!/bin/bash')
     if verbose:
-        cmd_builder.echo('Running Doodad Archive [DAR] $1')
-        cmd_builder.echo('DAR build information:')
-        cmd_builder.append('cat', './METADATA')
+        builder.echo('Running Doodad Archive [DAR] $1')
+        builder.echo('DAR build information:')
+        builder.append('cat', './METADATA')
 
     for mount in mounts:
         if verbose:
-            cmd_builder.append('echo', 'Mounting %s' % mount)
-        cmd_builder.append(mount.dar_extract_command())
+            builder.append('echo', 'Mounting %s' % mount)
+        builder.append(mount.dar_extract_command())
     if verbose:
-        cmd_builder.append('echo', BEGIN_HEADER)
-    cmd_builder.append(payload_script)
+        builder.append('echo', BEGIN_HEADER)
+    builder.append(payload_script)
 
     with open(runfile, 'w') as f:
-        f.write(cmd_builder.dump_script())
+        f.write(builder.dump_script())
 
     if verbose:
         print('[VERBOSE] Run script:')
@@ -160,22 +161,3 @@ def temp_archive_file():
     finally:
         shutil.rmtree(work_dir)
 
-
-if __name__ == "__main__":
-    import doodad.darchive.mount
-    mnts = []
-    mnts.append(doodad.launcher.mount.MountLocal(local_dir='./',
-                                                mount_point='./code/doodad2'))
-    mnts.append(doodad.launcher.mount.MountGit(
-        git_url='git@github.com:justinjfu/doodad.git',
-        branch='v2',
-        mount_point='./code/doodad'
-    ))
-
-    payload_script = cmd_util.CommandBuilder()
-    payload_script.append('python', './code/doodad/scripts/pull_s3_logs.py')
-    
-    build_archive('runfile.dar', 
-        payload_script=payload_script,
-        verbose=True, mounts=mnts)
-  

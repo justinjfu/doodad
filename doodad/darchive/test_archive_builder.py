@@ -6,7 +6,7 @@ from doodad.dfile import s3_file
 from doodad.dfile import ssh_file
 from doodad.dfile import http_file
 
-from doodad.darchive import cmd_util, mount, archive_builder_docker
+from doodad.darchive import mount, archive_builder_docker
 from doodad.utils import TESTING_DIR
 
 
@@ -20,8 +20,7 @@ class TestDockerArchiveBuilder(unittest.TestCase):
             mount_point='./code/doodad'
         ))
 
-        payload_script = cmd_util.CommandBuilder()
-        payload_script.append('python3', './code/doodad/test/hello_world.py')
+        payload_script = 'python3 ./code/doodad/test/hello_world.py'
         
         archive = archive_builder_docker.build_archive(payload_script=payload_script,
                                                 verbose=False, 
@@ -37,8 +36,7 @@ class TestDockerArchiveBuilder(unittest.TestCase):
             local_dir=TESTING_DIR,
             mount_point='./mymount'
         ))
-        payload_script = cmd_util.CommandBuilder()
-        payload_script.append('cat', './mymount/secret.txt')
+        payload_script = 'cat ./mymount/secret.txt'
         
         archive = archive_builder_docker.build_archive(payload_script=payload_script,
                                                 verbose=False, 
