@@ -1,12 +1,12 @@
 # doodad
 
+A library for packaging dependencies and launching scripts (with a focus on python) on different platforms using Docker.
+Currently supported platforms include EC2, GCP, and remotely via SSH.
 
-A library for launching python programs on different machines. Currently supports running locally and over EC2 and SSH (via Docker) with minimal (if any) modification to your existing program.
-
-EC2 code is based on [rllab](https://github.com/rll/rllab/)'s code.
-
+doodad is designed to be as minimally invasive in your code as possible. 
 
 ## Setup
+- Install [Docker CE](https://docs.docker.com/engine/installation/).
 
 - Add this repo to your pythonpath. 
 ```
@@ -23,17 +23,32 @@ pip install -r requirements.txt
 python scripts/ec2_setup.py
 ```
 
-- (Optional) Set up [Docker](https://docs.docker.com/engine/installation/). This is required on the target machine if running in a Docker-enabled mode.
-
-
-## Example
-
-See [ec2_launch_test.py](https://github.com/justinjfu/doodad/blob/master/examples/ec2_launch/ec2_launch_test.py) for an example on how to run scripts on EC2, over SSH, or locally.
-
 ## Tutorial
+A simple hello world program:
+```
+from doodad.launch import launch_api, mode
 
-See the [wiki](https://github.com/justinjfu/doodad/wiki/Home)
+launch_api.run_command(
+    command='echo helloworld',
+    mode=mode.LocalMode(),
+)
+```
+This will launch a docker container and execute the command `echo helloworld`.
 
-## TODOs
-- Add support for automatic experiment restarting (will require the user to write a save_state and restore_state function, or use something like CRIU)
-- Fix output directories when using docker showing up as root permissions.
+Launching a python program:
+```
+from doodad.launch import launch_api, mode
+
+launch_api.run_python(
+    target='path/to/my/python/script.py',
+    mode=mode.LocalMode(),
+)
+```
+This will launch a docker container and execute the python script.
+
+
+See the [wiki](https://github.com/justinjfu/doodad/wiki/Home) for more details on how to package dependencies, and run programs remotely.
+
+## Misc
+
+EC2 code is based on [rllab](https://github.com/rll/rllab/)'s code.
