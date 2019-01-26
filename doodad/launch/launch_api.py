@@ -5,19 +5,21 @@ from doodad.darchive import mount
 
 
 def run_command(
-    command,
-    mode,
-    mounts=tuple(),
-    return_output=False,
+        command,
+        mode,
+        mounts=tuple(),
+        return_output=False,
     ):
-
-    archive = archive_builder.build_archive(payload_script=command,
-                                            verbose=False, 
-                                            docker_image='python:3',
-                                            mounts=mounts)
-    result = mode.run_script(archive, return_output=return_output)
+    with archive_builder.temp_archive_file() as archive_file:
+        archive = archive_builder.build_archive(archive_filename=archive_file,
+                                                payload_script=command,
+                                                verbose=False, 
+                                                docker_image='python:3',
+                                                mounts=mounts)
+        result = mode.run_script(archive, return_output=return_output)
     if return_output:
         result = archive_builder._strip_stdout(result)
+
     return result
 
 
@@ -36,12 +38,13 @@ def run_python(
     command = make_python_command(
         target_full_path,
     )
-
-    archive = archive_builder.build_archive(payload_script=command,
-                                            verbose=False, 
-                                            docker_image='python:3',
-                                            mounts=mounts)
-    result = mode.run_script(archive, return_output=return_output)
+    with archive_builder.temp_archive_file() as archive_file:
+        archive = archive_builder.build_archive(archive_filename=archive_file,
+                                                payload_script=command,
+                                                verbose=False, 
+                                                docker_image='python:3',
+                                                mounts=mounts)
+        result = mode.run_script(archive, return_output=return_output)
     if return_output:
         result = archive_builder._strip_stdout(result)
     return result

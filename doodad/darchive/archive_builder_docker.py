@@ -5,7 +5,7 @@ import shutil
 import time
 import subprocess
 import uuid
-
+import contextlib
 
 import doodad
 from doodad.darchive import cmd_util, mount
@@ -132,6 +132,16 @@ def _strip_stdout(output):
         begin_output += len(BEGIN_HEADER)
     output = output[begin_output+1:]
     return output
+
+@contextlib.contextmanager
+def temp_archive_file():
+    work_dir = tempfile.mkdtemp()
+    try:
+        archive_file = os.path.join(work_dir, 'archive.dar')
+        yield archive_file
+    finally:
+        shutil.rmtree(work_dir)
+
 
 if __name__ == "__main__":
     import doodad.darchive.mount

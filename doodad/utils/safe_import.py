@@ -25,7 +25,7 @@ class FailedImportModule(object):
 
 def try_import(name):
     try:
-        importlib.import_module(name)
+        return importlib.import_module(name)
     except ImportError:
         return FailedImportModule(name)
     

@@ -44,6 +44,5 @@ class TestLaunchAPI(unittest.TestCase):
         self.assertEqual(result.strip(), 'hello123')
 
 
-
 if __name__ == '__main__':
     unittest.main()
