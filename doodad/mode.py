@@ -318,6 +318,7 @@ class EC2SpotDocker(DockerMode):
 
         sio = StringIO()
         sio.write("#!/bin/bash\n")
+        sio.write("set -v")
         sio.write("truncate -s 0 /home/ubuntu/user_data.log\n")
         sio.write("{\n")
         sio.write('die() { status=$1; shift; echo "FATAL: $*"; exit $status; }\n')
