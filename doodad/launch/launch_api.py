@@ -31,7 +31,7 @@ def run_python(
     target_dir = os.path.dirname(target)
     target_mount_dir = os.path.join(target_mount_dir, os.path.basename(target_dir))
     target_mount = mount.MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
-    mount_points = list(mounts) + [target_mount]
+    mounts = list(mounts) + [target_mount]
     target_full_path = os.path.join(target_mount.mount_point, os.path.basename(target))
     command = make_python_command(
         target_full_path,
@@ -45,6 +45,7 @@ def run_python(
     if return_output:
         result = archive_builder._strip_stdout(result)
     return result
+
 
 def make_python_command(
         target,

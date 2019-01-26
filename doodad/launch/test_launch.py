@@ -5,6 +5,7 @@ import contextlib
 
 from doodad.launch import mode
 from doodad.launch import launch_api
+from doodad.utils import TESTING_DIR
 
 
 @contextlib.contextmanager
@@ -24,14 +25,24 @@ class TestLocalMode(unittest.TestCase):
 
 
 class TestLaunchAPI(unittest.TestCase):
-    def test_hello(self):
+    def test_run_command(self):
         launcher = mode.LocalMode()
         result = launch_api.run_command(
             'echo hello123',
             mode=launcher,
             return_output=True
         )
-        self.assertEqual(result, 'hello123\n')
+        self.assertEqual(result.strip(), 'hello123')
+
+    def test_run_python(self):
+        launcher = mode.LocalMode()
+        result = launch_api.run_python(
+            target=path.join(TESTING_DIR, 'hello_world.py'),
+            mode=launcher,
+            return_output=True
+        )
+        self.assertEqual(result.strip(), 'hello123')
+
 
 
 if __name__ == '__main__':

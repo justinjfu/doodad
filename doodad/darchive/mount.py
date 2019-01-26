@@ -82,9 +82,8 @@ class MountLocal(Mount):
         self.filter_dir = filter_dir
         if mount_point is None:
             self.mount_point = self.local_dir
-            self.no_remount = True
         else:
-            self.no_remount = False
+            assert not self.mount_point.endswith('/'), "Do not end mount points with backslash"
 
     def dar_build_archive(self, deps_dir):
         dep_dir = os.path.join(deps_dir, 'local', self.name)

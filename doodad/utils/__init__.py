@@ -4,6 +4,8 @@ import hashlib
 _UTILS_DIR = os.path.dirname(os.path.realpath(__file__))
 PKG_DIR = os.path.dirname(_UTILS_DIR)
 REPO_DIR = os.path.dirname(PKG_DIR)
+TESTING_DIR = os.path.join(REPO_DIR, 'testing')
+SCRIPTS_DIR = os.path.join(REPO_DIR, 'scripts')
 
 HASH_BUF_SIZE = 65536 
 

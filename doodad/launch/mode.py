@@ -54,7 +54,7 @@ class GCPMode(LaunchMode):
                  disk_size='64Gb',
                  terminate_on_end=True,
                  preemptible=True,
-                 zone='us-west1-a',
+                 zone='auto',
                  instance_type='n1-standard-1',
                  log_prefix='gcp_experiment',
                  **kwargs):
@@ -96,9 +96,11 @@ class GCPMode(LaunchMode):
             image=self.gce_image,
         ).execute()
         source_disk_image = image_response['selfLink']
+        if self.zone == 'auto':
+            raise NotImplementedError('auto zone finder')
         config = {
             'name': name,
-            'machineType': gcp_util.get_machine_type(self.zone, self.instance_type),
+            'machineType': gcp_util.get_machine_type(zone, self.instance_type),
             'disks': [{
                     'boot': True,
                     'autoDelete': True,
@@ -135,7 +137,7 @@ class GCPMode(LaunchMode):
         }
         return self.compute.instances().insert(
             project=self.gcp_project,
-            zone=self.zone,
+            zone=zone,
             body=config
         ).execute()
 
