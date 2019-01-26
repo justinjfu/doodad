@@ -16,7 +16,6 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         ))
 
         payload_script = 'python3 ./code/doodad/test/hello_world.py'
-        
         archive = archive_builder_docker.build_archive(payload_script=payload_script,
                                                 verbose=False, 
                                                 docker_image='python:3',
@@ -24,6 +23,26 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         output, errors = archive_builder_docker.run_archive(archive, timeout=5)
         output = output.strip()
         self.assertEqual(output, 'hello world!')
+
+    def test_git_repo_pythonpath(self):
+        mnts = []
+        mnts.append(mount.MountGit(
+            git_url='https://github.com/justinjfu/doodad.git',
+            branch='archive_builder_test',
+            ssh_identity='~/.ssh/github',
+            mount_point='./code/doodad',
+            pythonpath=True
+        ))
+
+        payload_script = 'python3 ./code/doodad/test/test_import.py'
+        
+        archive = archive_builder_docker.build_archive(payload_script=payload_script,
+                                                verbose=False, 
+                                                docker_image='python:3',
+                                                mounts=mnts)
+        output, errors = archive_builder_docker.run_archive(archive, timeout=5)
+        output = output.strip()
+        self.assertEqual(output, 'apple')
 
     def test_local_repo(self):
         mnts = []

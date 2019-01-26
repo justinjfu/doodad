@@ -101,6 +101,8 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
         if verbose:
             builder.append('echo', 'Mounting %s' % mount)
         builder.append(mount.dar_extract_command())
+        if mount.pythonpath:
+            builder.append('export PYTHONPATH=$PYTHONPATH:%s' % mount.mount_point)
     if verbose:
         builder.append('echo', BEGIN_HEADER)
     builder.append(payload_script)
