@@ -23,6 +23,7 @@ class TestModes(unittest.TestCase):
         with hello_script() as script_name:
             output = launcher.run_script(script_name, return_output=True)
             self.assertEqual(output, 'hello123\n')
+            output = launcher.run_script(script_name, return_output=True, dry=True)
 
     def test_gcp(self):
         # Run a dry test
@@ -40,6 +41,16 @@ class TestModes(unittest.TestCase):
 
 
 class TestLaunchAPI(unittest.TestCase):
+    def test_run_no_output(self):
+        """Simple test to check for no errors
+        """
+        launcher = mode.LocalMode()
+        result = launch_api.run_command(
+            'echo hello123',
+            mode=launcher,
+            return_output=False
+        )
+
     def test_run_command(self):
         launcher = mode.LocalMode()
         result = launch_api.run_command(

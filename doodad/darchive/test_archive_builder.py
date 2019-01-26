@@ -1,11 +1,6 @@
 import unittest
 import os.path as path
 
-from doodad.dfile import doodad_file as dfile
-from doodad.dfile import s3_file
-from doodad.dfile import ssh_file
-from doodad.dfile import http_file
-
 from doodad.darchive import mount, archive_builder_docker
 from doodad.utils import TESTING_DIR
 
@@ -48,7 +43,8 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         self.assertEqual(output, 'apple')
 
     def test_s3(self):
-        """ This test doesn't actually run things it just makes sure nothing errors.
+        """ Dry-run test for MountS3
+        This test doesn't actually run things it just makes sure nothing errors.
         (we don't actually want to launch a test on EC2 and spend money) 
         """
         mnts = []
@@ -66,7 +62,8 @@ class TestDockerArchiveBuilder(unittest.TestCase):
                                                 mounts=mnts)
 
     def test_gcp(self):
-        """ This test doesn't actually run things it just makes sure nothing errors.
+        """ Dry-run test for MountGCP
+        This test doesn't actually run things it just makes sure nothing errors.
         (we don't actually want to launch a test on EC2 and spend money) 
         """
         mnts = []

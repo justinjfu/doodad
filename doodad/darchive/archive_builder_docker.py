@@ -123,6 +123,7 @@ def compile_archive(archive_dir, output_file, verbose=False):
     pipe = subprocess.PIPE
     p = subprocess.Popen(compile_cmd, shell=True, stdout=pipe, stderr=pipe)
     p.wait()
+    p.communicate()
     os.chmod(output_file, 0o777)
 
 def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None):

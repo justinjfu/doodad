@@ -34,7 +34,8 @@ class LaunchMode(object):
         """
         if return_output:
             output = shell.call_and_get_output(self._get_run_command(script_filename), shell=True, dry=dry)
-            return output.decode('utf-8')
+            if output:
+                return output.decode('utf-8')
         else:
             shell.call(self._get_run_command(script_filename), shell=True, dry=dry, wait=not self.async_run)
 
