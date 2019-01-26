@@ -3,3 +3,5 @@ boto3
 boto
 cloudpickle
 awscli
+google-api-python-client
+google-cloud-storage

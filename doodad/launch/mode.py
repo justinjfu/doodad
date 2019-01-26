@@ -6,6 +6,7 @@ from doodad.utils import safe_import
 from doodad.darchive import mount
 
 googleapiclient = safe_import.try_import('googleapiclient')
+googleapiclient.discovery = safe_import.try_import('googleapiclient.discovery')
 from doodad.apis import gcp_util 
 
 
@@ -61,12 +62,26 @@ class SSHMode(LaunchMode):
 
 
 class GCPMode(LaunchMode):
+    """
+    GCP Launch Mode.
+
+    Args:
+        gcp_project (str): Name of GCP project to launch from
+        gcp_log_mount (str): A MountGCP object for logging stdout information.
+        gce_image (str): Name of GCE image from which to base instance.
+        gce_image_project (str): Name of project gce_image belongs to.
+        disk_size (int): Amount of disk to allocate to instance in Gb.
+        terminate_on_end (bool): Terminate instance when script finishes
+        preemptible (bool): Start a preemptible instance
+        zone (str): GCE compute zone.
+        instance_type (str): GCE instance type
+    """
     def __init__(self, 
                  gcp_project,
-                 gce_log_mount,
+                 gcp_log_mount,
                  gce_image='ubuntu-1804-bionic-v20181222',
                  gce_image_project='ubuntu-os-cloud',
-                 disk_size='64Gb',
+                 disk_size=64,
                  terminate_on_end=True,
                  preemptible=True,
                  zone='auto',
@@ -75,8 +90,9 @@ class GCPMode(LaunchMode):
                  **kwargs):
         super(GCPMode, self).__init__(**kwargs)
         self.gcp_project = gcp_project
-        assert isinstance(gce_log_mount, mount.MountGCP)
-        self.gce_log_mount = gce_log_mount
+        assert isinstance(gcp_log_mount, mount.MountGCP)
+        self.gce_log_mount = gcp_log_mount
+        self.gcp_bucket = gcp_log_mount.gcp_bucket
         self.gcp_log_prefix = log_prefix
         self.gce_image = gce_image
         self.gce_image_project = gce_image_project
@@ -90,24 +106,28 @@ class GCPMode(LaunchMode):
     def run_script(self, script, dry=False, return_output=False):
         if return_output:
             raise NotImplementedError()
-        # TODO: need to upload script to GCS
+
+        # Upload script to GCS
+        remote_script = gcp_util.upload_file_to_gcp_storage(self.gcp_bucket, script, dry=dry)
 
         exp_name = "{}-{}".format(self.gcp_log_prefix, gcp_util.make_timekey())
         exp_prefix = self.gcp_log_prefix
 
-        run_cmd = self._get_run_command(script)
         metadata = {
+            'shell_interpreter': self.shell_interpreter,
+            'gcp_bucket_path': self.gce_log_mount.gcp_path,
+            'script_path': remote_script,
             'bucket_name': self.gce_log_mount.gcp_bucket,
-            'docker_cmd': run_cmd,
             'terminate': json.dumps(self.terminate_on_end),
             'startup-script': open(gcp_util.GCP_STARTUP_SCRIPT_PATH, "r").read(),
             'shutdown-script': open(gcp_util.GCP_SHUTDOWN_SCRIPT_PATH, "r").read(),
         }
         # instance name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'">
         unique_name= "doodad" + str(uuid.uuid4()).replace("-", "")
-        self.create_instance(metadata, unique_name, exp_name, exp_prefix)
+        self.create_instance(metadata, unique_name, exp_name, exp_prefix, dry=dry)
+        return metadata
 
-    def create_instance(self, metadata, name, exp_name="", exp_prefix=""):
+    def create_instance(self, metadata, name, exp_name="", exp_prefix="", dry=False):
         image_response = self.compute.images().get(
             project=self.gce_image_project,
             image=self.gce_image,
@@ -154,11 +174,10 @@ class GCPMode(LaunchMode):
                 "exp_prefix": exp_prefix,
             }
         }
-        return self.compute.instances().insert(
+        compute_instances = self.compute.instances().insert(
             project=self.gcp_project,
             zone=zone,
             body=config
-        ).execute()
-
-    def _get_run_command(self, script_filename):
-        return '%s %s' % (self.shell_interpreter, script_filename)
+        )
+        if not dry:
+            return compute_instances.execute()

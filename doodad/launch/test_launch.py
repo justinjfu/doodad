@@ -6,6 +6,7 @@ import contextlib
 from doodad.launch import mode
 from doodad.launch import launch_api
 from doodad.utils import TESTING_DIR
+from doodad.darchive import mount
 
 
 @contextlib.contextmanager
@@ -16,12 +17,25 @@ def hello_script(message='hello123'):
         yield tfile.name
 
 
-class TestLocalMode(unittest.TestCase):
-    def test_hello(self):
+class TestModes(unittest.TestCase):
+    def test_local(self):
         launcher = mode.LocalMode()
         with hello_script() as script_name:
             output = launcher.run_script(script_name, return_output=True)
             self.assertEqual(output, 'hello123\n')
+
+    def test_gcp(self):
+        # Run a dry test
+        # (we don't actually want to spend money running GCP)
+        launcher = mode.GCPMode(
+            gcp_project='testing',
+            gcp_log_mount=mount.MountGCP('us-west1-a', 'testbucket', 'test_path'),
+            zone='us-east1-b',
+        )
+        with hello_script() as script_name:
+            metadata = launcher.run_script(script_name, dry=True)
+        self.assertEqual(metadata['gcp_bucket_path'], 'test_path')
+        self.assertEqual(metadata['bucket_name'], 'testbucket')
 
 
 class TestLaunchAPI(unittest.TestCase):
