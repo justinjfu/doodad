@@ -10,7 +10,7 @@ from doodad.utils import TESTING_DIR
 
 @contextlib.contextmanager
 def hello_script(message='hello123'):
-    with tempfile.NamedTemporaryFile() as tfile:
+    with tempfile.NamedTemporaryFile('w+') as tfile:
         tfile.write('echo %s\n' % message)
         tfile.seek(0)
         yield tfile.name

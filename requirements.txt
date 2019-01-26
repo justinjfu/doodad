@@ -1,3 +1,4 @@
+six
 boto3
 boto
 cloudpickle
