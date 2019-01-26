@@ -1,0 +1,37 @@
+language: python
+
+
+env:
+  - PYTHON=2.7 
+  - PYTHON=3.6 
+
+services:
+  - docker
+
+before_install:
+  - sudo apt-get update -yq
+  - wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+
+
+install:
+  - conda create -n testenv pip python=$PYTHON
+  - source activate testenv
+  - pip install -r requirements.txt
+  - pip install -r testing/requirements.txt
+
+before_script:
+  - make build
+
+script:
+  - make test
+  - make coverage
+
+after_success:
+  - pip install codecov
+  - codecov

@@ -52,7 +52,7 @@ def run_python(
         mode,
         target_mount_dir='target',
         mounts=tuple(),
-        return_output=False,
+        **kwargs
     ):
     """
     Runs a python script using doodad via a specified launch mode.
@@ -63,8 +63,7 @@ def run_python(
         target_mount_dir (str): Directory to mount the target inside container.
             Default is 'target'. Changing this is usually unnecessary.
         mounts (tuple): A list/tuple of Mount objects
-        return_output (bool): If True, returns stdout as a string.
-            Do not use if the output will be large.
+        **kwargs: Arguments to run_command
     
     Returns:
         A string output if return_output is True,
@@ -78,16 +77,7 @@ def run_python(
     command = make_python_command(
         target_full_path,
     )
-    with archive_builder.temp_archive_file() as archive_file:
-        archive = archive_builder.build_archive(archive_filename=archive_file,
-                                                payload_script=command,
-                                                verbose=False, 
-                                                docker_image='python:3',
-                                                mounts=mounts)
-        result = mode.run_script(archive, return_output=return_output)
-    if return_output:
-        result = archive_builder._strip_stdout(result)
-    return result
+    return run_command(command, mode, mounts=mounts, **kwargs)
 
 
 def make_python_command(
