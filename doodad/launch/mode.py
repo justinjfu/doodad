@@ -10,6 +10,13 @@ from doodad.apis import gcp_util
 
 
 class LaunchMode(object):
+    """
+    A LaunchMode object is responsible for executing a shell script on a specified platform.
+
+    Args:
+        shell_interpreter (str): Interpreter command for script. Default 'sh'
+        async_run (bool): If True, 
+    """
     def __init__(self, shell_interpreter='sh', async_run=False):
         self.shell_interpreter = shell_interpreter
         self.async_run = async_run
@@ -17,22 +24,30 @@ class LaunchMode(object):
     def run_script(self, script_filename, dry=False, return_output=False):
         """
         Runs a shell script.
+
+        Args:
+            script_filename (str): A string path to a shell script.
+            dry (bool): If True, prints commands to be run but does not run them.
+            return_output (bool): If True, returns stdout from the script as a string.
         """
         if return_output:
-            output = shell.call_and_get_output(self.get_run_command(script_filename), shell=True, dry=dry)
+            output = shell.call_and_get_output(self._get_run_command(script_filename), shell=True, dry=dry)
             return output.decode('utf-8')
         else:
-            shell.call(self.get_run_command(script_filename), shell=True, dry=dry, wait=not self.async_run)
+            shell.call(self._get_run_command(script_filename), shell=True, dry=dry, wait=not self.async_run)
 
-    def get_run_command(self, script_filename):
+    def _get_run_command(self, script_filename):
         raise NotImplementedError()
 
 
 class LocalMode(LaunchMode):
+    """
+    A LocalMode executes commands locally using the host computer's shell interpreter.
+    """
     def __init__(self, **kwargs):
         super(LocalMode, self).__init__(**kwargs)
 
-    def get_run_command(self, script_filename):
+    def _get_run_command(self, script_filename):
         return '%s %s' % (self.shell_interpreter, script_filename)
 
 
@@ -41,7 +56,7 @@ class SSHMode(LaunchMode):
         super(SSHMode, self).__init__(**kwargs)
         self.ssh_cred = ssh_credentials
 
-    def get_run_command(self, script_filename):
+    def _get_run_command(self, script_filename):
         return self.ssh_cred.get_ssh_script_cmd(script_filename)
 
 
@@ -75,10 +90,12 @@ class GCPMode(LaunchMode):
     def run_script(self, script, dry=False, return_output=False):
         if return_output:
             raise NotImplementedError()
+        # TODO: need to upload script to GCS
+
         exp_name = "{}-{}".format(self.gcp_log_prefix, gcp_util.make_timekey())
         exp_prefix = self.gcp_log_prefix
 
-        run_cmd = self.get_run_command(script)
+        run_cmd = self._get_run_command(script)
         metadata = {
             'bucket_name': self.gce_log_mount.gcp_bucket,
             'docker_cmd': run_cmd,
@@ -98,6 +115,8 @@ class GCPMode(LaunchMode):
         source_disk_image = image_response['selfLink']
         if self.zone == 'auto':
             raise NotImplementedError('auto zone finder')
+        zone = self.zone
+
         config = {
             'name': name,
             'machineType': gcp_util.get_machine_type(zone, self.instance_type),
@@ -141,5 +160,5 @@ class GCPMode(LaunchMode):
             body=config
         ).execute()
 
-    def get_run_command(self, script_filename):
+    def _get_run_command(self, script_filename):
         return '%s %s' % (self.shell_interpreter, script_filename)

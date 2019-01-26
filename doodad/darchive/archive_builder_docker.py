@@ -1,3 +1,12 @@
+"""
+Library for building runnable Doodad Archives.
+
+Doodad Archives package code and data into a single
+executable shell script, which runs within a docker container.
+
+Currently, doodad uses makeself as a backend to build these
+packaged scripts.
+"""
 import os
 import sys
 import tempfile
@@ -15,15 +24,24 @@ MAKESELF_PATH = os.path.join(THIS_FILE_DIR, 'makeself.sh')
 MAKESELF_HEADER_PATH = os.path.join(THIS_FILE_DIR, 'makeself-header.sh')
 BEGIN_HEADER = '--- BEGIN DAR OUTPUT ---'
 
-def build_archive(archive_filename=None, 
+def build_archive(archive_filename='runfile.dar', 
                   docker_image='ubuntu:18.04',
                   payload_script='',
-                  launch_mode=None,
                   mounts=(),
                   verbose=False):
-    if archive_filename is None:
-        archive_filename = 'runfile.dar'
+    """
+    Construct a Doodad Archive
 
+    Args:
+        archive_filename (str): Name of file to save constructed archive script
+        docker_image (str): Name of docker image
+        payload_script (str): A command or sequence of shell commands to be 
+            executed inside the container on when the script is run.
+        mounts (tuple): A list of Mount objects
+    
+    Returns:
+        str: Name of archive file.
+    """
     # create a temporary work directory
     try:
         work_dir = tempfile.mkdtemp()
@@ -36,7 +54,7 @@ def build_archive(archive_filename=None,
             mnt.dar_build_archive(deps_dir)
         
         write_run_script(archive_dir, mounts, 
-            payload_script=payload_script, verbose=verbose)  #TODO:depends on launch mode
+            payload_script=payload_script, verbose=verbose) 
         write_docker_hook(archive_dir, docker_image, mounts, verbose=verbose)
         write_metadata(archive_dir)
 
