@@ -12,13 +12,16 @@ import os
 
 from doodad.darchive import archive_builder_docker as archive_builder
 from doodad.darchive import mount
+from doodad.launch import mode
 
 
 def run_command(
         command,
-        mode,
+        mode=mode.LocalMode(),
         mounts=tuple(),
         return_output=False,
+        verbose=False,
+        docker_image='ubuntu:18.04'
     ):
     """
     Runs a shell command using doodad via a specified launch mode.
@@ -38,9 +41,9 @@ def run_command(
         archive = archive_builder.build_archive(archive_filename=archive_file,
                                                 payload_script=command,
                                                 verbose=False, 
-                                                docker_image='python:3',
+                                                docker_image=docker_image,
                                                 mounts=mounts)
-        result = mode.run_script(archive, return_output=return_output)
+        result = mode.run_script(archive, return_output=return_output, verbose=verbose)
     if return_output:
         result = archive_builder._strip_stdout(result)
 
@@ -52,6 +55,7 @@ def run_python(
         mode,
         target_mount_dir='target',
         mounts=tuple(),
+        docker_image='python:3',
         **kwargs
     ):
     """
@@ -77,7 +81,7 @@ def run_python(
     command = make_python_command(
         target_full_path,
     )
-    return run_command(command, mode, mounts=mounts, **kwargs)
+    return run_command(command, mode, docker_image=docker_image, mounts=mounts, **kwargs)
 
 
 def make_python_command(

@@ -34,7 +34,8 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         mnts = []
         mnts.append(mount.MountLocal(
             local_dir=TESTING_DIR,
-            mount_point='./mymount'
+            mount_point='./mymount',
+            output=False
         ))
         payload_script = 'cat ./mymount/secret.txt'
         
@@ -70,10 +71,7 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         """
         mnts = []
         mnts.append(mount.MountGCP(
-            zone='us-west1',
-            gcp_bucket='my.bucket',
-            gcp_path='logs/mylogs',
-            local_dir=TESTING_DIR,
+            local_dir='test_dir',
             dry=True,
         ))
         payload_script = 'echo hello123'

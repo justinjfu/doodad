@@ -1,19 +1,4 @@
 #!/bin/bash
-install_docker() {
-    sudo apt-get install -y --no-install-recommends \
-        apt-transport-https \
-        curl \
-        software-properties-common
-    curl -fsSL 'https://sks-keyservers.net/pks/lookup?op=get&search=0xee6d536cf7dc86e2d7d56f59a178ac6c6238f52e' | sudo apt-key add -
-    sudo add-apt-repository \
-       "deb https://packages.docker.com/1.12/apt/repo/ \
-       ubuntu-$(lsb_release -cs) \
-       main"
-    sudo apt-get update
-    sudo apt-get -y install docker-engine
-    sudo usermod -a -G docker ubuntu
-}
-
 query_metadata() {
     attribute_name=$1
     curl http://metadata/computeMetadata/v1/instance/attributes/$attribute_name -H "Metadata-Flavor: Google"
@@ -22,15 +7,15 @@ query_metadata() {
 {
     bucket_name=$(query_metadata bucket_name)
     shell_interpreter=$(query_metadata shell_interpreter)
-    remote_script=$(query_metadata remote_script)
+    remote_script_path=$(query_metadata remote_script_path)
     use_gpu=$(query_metadata use_gpu)
     terminate=$(query_metadata terminate)
     gcp_bucket_path=$(query_metadata gcp_bucket_path)
     instance_name=$(curl http://metadata/computeMetadata/v1/instance/name -H "Metadata-Flavor: Google")
     echo "bucket_name:" $bucket_name
-    echo "docker_cmd:" $docker_cmd
-    echo "local_mounts:" $local_mounts
-    echo "gcp_mounts:" $gcp_mounts
+    echo "gcp_bucket_path:" $gcp_bucket_path
+    echo "shell_interpreter:" $shell_interpreter
+    echo "remote_script:" $remote_script_path
     echo "use_gpu:" $use_gpu
     echo "terminate:" $terminate
     echo "instance_name:" $instance_name
@@ -51,12 +36,16 @@ query_metadata() {
     echo "image pulled"
 
     # download script
-    gsutil cp gs://$bucket_name/$remote_script /tmp/remote_script.sh
+    echo "downloading script"
+    gsutil cp gs://$bucket_name/$remote_script_path /tmp/remote_script.sh
 
-    # setup GCP. Install crcmod for faster rsync
-    sudo apt-get install gcc python-dev python-setuptools
-    sudo pip uninstall crcmod
-    sudo pip install -U crcmod
+    # sync mount
+    # Because GCPMode has no idea where the mounts are (the archive has them)
+    # we just make the archive store everything into /doodad
+    while /bin/true; do
+        gsutil -m rsync -r /doodad gs://$bucket_name/$gcp_bucket_path/logs
+        sleep 15
+    done & echo sync from /doodad to gs://$bucket_name/$gcp_bucket_path/logs initiated
 
     # sync stdout
     gcp_bucket_path=${gcp_bucket_path%/}  # remove trailing slash if present

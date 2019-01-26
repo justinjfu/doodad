@@ -15,6 +15,7 @@ import time
 import subprocess
 import uuid
 import contextlib
+import uuid
 
 import doodad
 from doodad.darchive import mount
@@ -75,8 +76,8 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
     docker_hook_file = os.path.join(arch_dir, 'docker.sh')
     builder = cmd_builder.CommandBuilder()
     builder.append('#!/bin/bash')
-    mnt_cmd = ''.join([' -v %s:%s' % (mnt.local_dir, mnt.mount_point) 
-        for mnt in mounts if isinstance(mnt, mount.MountLocal) and mnt.writeable])
+    mnt_cmd = ''.join([' -v %s:%s' % (mnt.sync_dir, mnt.mount_point) 
+        for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/payload'
     builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /payload;./run.sh"'.format(
@@ -145,7 +146,7 @@ def _strip_stdout(output):
 def temp_archive_file():
     work_dir = tempfile.mkdtemp()
     try:
-        archive_file = os.path.join(work_dir, 'archive.dar')
+        archive_file = os.path.join(work_dir, str(uuid.uuid4()).replace('-', '_')+'.dar')
         yield archive_file
     finally:
         shutil.rmtree(work_dir)

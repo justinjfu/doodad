@@ -19,7 +19,7 @@ from doodad import utils
 class Mount(object):
     """
     Args:
-        mount_point (str): Location of directory visible to the running process
+        mount_point (str): Location of directory visible to the running process *inside* container
         pythonpath (bool): If True, adds this folder to the $PYTHON_PATH environment variable
         output (bool): If False, this is a "code" directory. If True, this should be an empty
             "output" directory (nothing will be copied to remote)
@@ -69,6 +69,8 @@ class Mount(object):
 
 
 class MountLocal(Mount):
+    """
+    """
     def __init__(self, local_dir, mount_point=None, cleanup=True,
                 filter_ext=('.pyc', '.log', '.git', '.mp4'),
                 filter_dir=('data',),
@@ -76,7 +78,7 @@ class MountLocal(Mount):
         super(MountLocal, self).__init__(mount_point=mount_point, **kwargs)
         self.local_dir = os.path.realpath(os.path.expanduser(local_dir))
         self._name = self.local_dir.replace('/', '_')
-        self.local_dir_raw = local_dir
+        self.sync_dir = local_dir
         self.cleanup = cleanup
         self.filter_ext = filter_ext
         self.filter_dir = filter_dir
@@ -271,55 +273,39 @@ class MountS3(Mount):
 
 class MountGCP(Mount):
     def __init__(self, 
-                zone,
-                gcp_bucket,
-                gcp_path, 
-                local_dir=None,
+                gcp_path=None,
                 sync_interval=15, 
                 output=True,
                 dry=False,
                 exclude_regex='*.tmp',
                 **kwargs):
+        """
+
+        Args:
+            zone (str): Zone name. i.e. 'us-west1-a'
+            gcp_bucket (str): Bucket name
+            gcp_path (str): Path underneath bucket. The full path will become
+                gs://{gcp_bucket}/{gcp_path}
+        """
         super(MountGCP, self).__init__(output=output, **kwargs)
         # load from config
-        self.gcp_bucket = gcp_bucket
-        self.gcp_path = gcp_path
-        self.zone = zone
+        if gcp_path.startswith('/'):
+            raise NotImplementedError('Local dir cannot be absolute')
+        else:
+            # We store everything into a fixed dir /doodad on the remote machine
+            # so GCPMode knows to simply sync /doodad
+            # (this is b/c we no longer pass in mounts to the launch mode)
+            self.sync_dir = os.path.join('/doodad', gcp_path)
         self.output = output
         self.sync_interval = sync_interval
         self.sync_on_terminate = True
         self.exclude_string = '"'+exclude_regex+'"'
-        self._name = '%s.%s' % (self.gcp_bucket, self.gcp_path.replace('/', '.'))
+        self._name = self.sync_dir.replace('/', '_')
         self.dry = dry
         assert output
 
     def dar_build_archive(self, deps_dir):
-        dep_dir = os.path.join(deps_dir, 'gcp', self.name)
-        os.makedirs(dep_dir)
-        extract_file = os.path.join(dep_dir, 'extract.sh')
-
-        with open(extract_file, 'w') as f:
-            # f.write("mkdir -p {local_code_path}\n".format(local_code_path=mount_point))
-            f.write("mkdir -p {remote_dir}\n".format(
-                remote_dir=self.mount_point)
-            )
-            # Sync interval
-            f.write("""
-            while /bin/true; do
-                gsutil -m rsync -x {exclude_string} -r {log_dir} gs://{gcp_bucket}/{gcp_path}
-                sleep {periodic_sync_interval}
-            done & echo sync from {log_dir} to gs://{gcp_bucket}/{gcp_path} initiated
-            """.format(
-                exclude_string=self.exclude_string,
-                log_dir=self.mount_point,
-                gcp_bucket=self.gcp_bucket,
-                gcp_path=self.gcp_path,
-                periodic_sync_interval=self.sync_interval
-            ))
-        os.chmod(extract_file, 0o777)
+        return 
 
     def dar_extract_command(self):
-        # execute the script to pull from S3
-        return './deps/gcp/{name}/extract.sh'.format(
-            name=self.name,
-        )
+        return 'echo helloMountGCP'

@@ -29,7 +29,8 @@ class TestModes(unittest.TestCase):
         # (we don't actually want to spend money running GCP)
         launcher = mode.GCPMode(
             gcp_project='testing',
-            gcp_log_mount=mount.MountGCP('us-west1-a', 'testbucket', 'test_path'),
+            gcp_bucket='testbucket',
+            gcp_log_path='test_path',
             zone='us-east1-b',
         )
         with hello_script() as script_name:
@@ -53,8 +54,10 @@ class TestLaunchAPI(unittest.TestCase):
         result = launch_api.run_python(
             target=path.join(TESTING_DIR, 'hello_world.py'),
             mode=launcher,
-            return_output=True
+            return_output=True,
+            docker_image='python:3'
         )
+        print(result)
         self.assertEqual(result.strip(), 'hello123')
 
 

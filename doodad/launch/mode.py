@@ -22,13 +22,14 @@ class LaunchMode(object):
         self.shell_interpreter = shell_interpreter
         self.async_run = async_run
 
-    def run_script(self, script_filename, dry=False, return_output=False):
+    def run_script(self, script_filename, dry=False, return_output=False, verbose=False):
         """
         Runs a shell script.
 
         Args:
             script_filename (str): A string path to a shell script.
             dry (bool): If True, prints commands to be run but does not run them.
+            verbose (bool): Verbose mode
             return_output (bool): If True, returns stdout from the script as a string.
         """
         if return_output:
@@ -68,8 +69,8 @@ class GCPMode(LaunchMode):
     Args:
         gcp_project (str): Name of GCP project to launch from
         gcp_log_mount (str): A MountGCP object for logging stdout information.
-        gce_image (str): Name of GCE image from which to base instance.
-        gce_image_project (str): Name of project gce_image belongs to.
+        gcp_image (str): Name of GCE image from which to base instance.
+        gcp_image_project (str): Name of project gce_image belongs to.
         disk_size (int): Amount of disk to allocate to instance in Gb.
         terminate_on_end (bool): Terminate instance when script finishes
         preemptible (bool): Start a preemptible instance
@@ -78,60 +79,74 @@ class GCPMode(LaunchMode):
     """
     def __init__(self, 
                  gcp_project,
-                 gcp_log_mount,
-                 gce_image='ubuntu-1804-bionic-v20181222',
-                 gce_image_project='ubuntu-os-cloud',
+                 gcp_bucket,
+                 gcp_log_path,
+                 gcp_image='ubuntu-1804-bionic-v20181222',
+                 gcp_image_project='ubuntu-os-cloud',
                  disk_size=64,
                  terminate_on_end=True,
                  preemptible=True,
                  zone='auto',
                  instance_type='n1-standard-1',
-                 log_prefix='gcp_experiment',
+                 gcp_label='gcp_doodad',
                  **kwargs):
         super(GCPMode, self).__init__(**kwargs)
         self.gcp_project = gcp_project
-        assert isinstance(gcp_log_mount, mount.MountGCP)
-        self.gce_log_mount = gcp_log_mount
-        self.gcp_bucket = gcp_log_mount.gcp_bucket
-        self.gcp_log_prefix = log_prefix
-        self.gce_image = gce_image
-        self.gce_image_project = gce_image_project
+        self.gcp_bucket = gcp_bucket
+        self.gcp_log_path = gcp_log_path
+        self.gce_image = gcp_image
+        self.gce_image_project = gcp_image_project
         self.disk_size = disk_size
         self.terminate_on_end = terminate_on_end
         self.preemptible = preemptible
         self.zone = zone
         self.instance_type = instance_type
+        self.use_gpu = False
+        self.gcp_label = gcp_label
         self.compute = googleapiclient.discovery.build('compute', 'v1')
 
-    def run_script(self, script, dry=False, return_output=False):
+    def run_script(self, script, dry=False, return_output=False, verbose=False):
         if return_output:
             raise NotImplementedError()
 
         # Upload script to GCS
         remote_script = gcp_util.upload_file_to_gcp_storage(self.gcp_bucket, script, dry=dry)
 
-        exp_name = "{}-{}".format(self.gcp_log_prefix, gcp_util.make_timekey())
-        exp_prefix = self.gcp_log_prefix
+        exp_name = "{}-{}".format(self.gcp_label, gcp_util.make_timekey())
+        exp_prefix = self.gcp_label
+
+        with open(gcp_util.GCP_STARTUP_SCRIPT_PATH) as f:
+            start_script = f.read()
+        with open(gcp_util.GCP_SHUTDOWN_SCRIPT_PATH) as f:
+            stop_script = f.read()
 
         metadata = {
             'shell_interpreter': self.shell_interpreter,
-            'gcp_bucket_path': self.gce_log_mount.gcp_path,
-            'script_path': remote_script,
-            'bucket_name': self.gce_log_mount.gcp_bucket,
+            'gcp_bucket_path': self.gcp_log_path,
+            'remote_script_path': remote_script,
+            'bucket_name': self.gcp_bucket,
             'terminate': json.dumps(self.terminate_on_end),
-            'startup-script': open(gcp_util.GCP_STARTUP_SCRIPT_PATH, "r").read(),
-            'shutdown-script': open(gcp_util.GCP_SHUTDOWN_SCRIPT_PATH, "r").read(),
+            'use_gpu': self.use_gpu,
+            'startup-script': start_script,
+            'shutdown-script': stop_script
         }
         # instance name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'">
         unique_name= "doodad" + str(uuid.uuid4()).replace("-", "")
-        self.create_instance(metadata, unique_name, exp_name, exp_prefix, dry=dry)
+        instance_info = self.create_instance(metadata, unique_name, exp_name, exp_prefix, dry=dry)
+        if verbose:
+            print('Launched instance %s' % unique_name)
+            print(instance_info)
         return metadata
 
     def create_instance(self, metadata, name, exp_name="", exp_prefix="", dry=False):
-        image_response = self.compute.images().get(
+        compute_images = self.compute.images().get(
             project=self.gce_image_project,
             image=self.gce_image,
-        ).execute()
+        )
+        if not dry:
+            image_response = compute_images.execute()
+        else:
+            image_response = {'selfLink': None}
         source_disk_image = image_response['selfLink']
         if self.zone == 'auto':
             raise NotImplementedError('auto zone finder')

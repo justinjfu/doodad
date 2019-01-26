@@ -30,22 +30,20 @@ python scripts/ec2_setup.py
 ## Tutorial
 A simple hello world program:
 ```
-from doodad.launch import launch_api, mode
+from doodad.launch import launch_api
 
 launch_api.run_command(
     command='echo helloworld',
-    mode=mode.LocalMode(),
 )
 ```
 This will launch a docker container and execute the command `echo helloworld`.
 
 Launching a python program:
 ```
-from doodad.launch import launch_api, mode
+from doodad.launch import launch_api
 
 launch_api.run_python(
     target='path/to/my/python/script.py',
-    mode=mode.LocalMode(),
 )
 ```
 This will launch a docker container and execute the python script.
