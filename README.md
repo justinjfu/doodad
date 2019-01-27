@@ -10,6 +10,8 @@ Currently supported platforms include EC2, GCP, and remotely via SSH.
 doodad is designed to be as minimally invasive in your code as possible. 
 
 ## Setup
+- Install python 2 or python 3. doodad is tested to work with python2.7 and python3.6 on Unix systems.
+
 - Install [Docker CE](https://docs.docker.com/engine/installation/).
 
 - Add this repo to your pythonpath. 
@@ -49,7 +51,7 @@ launch_api.run_python(
 This will launch a docker container and execute the python script.
 
 
-See the [wiki](https://github.com/justinjfu/doodad/wiki/Home) for more details on how to package dependencies, and run programs remotely.
+See the [wiki](https://github.com/justinjfu/doodad/wiki/Home) and [quickstart](https://github.com/justinjfu/doodad/wiki/Quickstart) guide for more details on how to package dependencies, and run programs remotely.
 
 ## Misc
 
