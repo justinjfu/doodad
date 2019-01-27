@@ -31,7 +31,7 @@ python scripts/ec2_setup.py
 
 ## Tutorial
 A simple hello world program:
-```
+```python
 from doodad.launch import launch_api
 
 launch_api.run_command(
@@ -41,7 +41,7 @@ launch_api.run_command(
 This will launch a docker container and execute the command `echo helloworld`.
 
 Launching a python program:
-```
+```python
 from doodad.launch import launch_api
 
 launch_api.run_python(
