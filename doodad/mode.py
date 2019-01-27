@@ -7,7 +7,7 @@ import pprint
 
 from doodad.utils import shell
 from doodad.utils import safe_import
-from doodad.darchive import mount
+from doodad import mount
 from doodad.apis.ec2.autoconfig import Autoconfig
 from doodad.credentials.ec2 import AWSCredentials
 

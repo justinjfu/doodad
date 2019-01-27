@@ -1,6 +1,6 @@
 import os
-from doodad.darchive import mount
-from doodad.launch import mode, launch_api
+from doodad import mount, mode
+from doodad.launch import launch_api
 from doodad.utils import TESTING_DIR
 from testing.config import GCP_PROJECT, GCP_BUCKET, GCP_IMAGE
 

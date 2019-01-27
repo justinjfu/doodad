@@ -48,25 +48,6 @@ class Mount(object):
     def __str__(self):
         return '%s@%s'% (type(self).__name__, self.name)
 
-    @contextmanager
-    def gzip(self, filter_ext=(), filter_dir=()):
-        """
-        Return filepath to a gzipped version of this directory for uploading
-        """
-        assert self.read_only
-        def filter_func(tar_info):
-            filt = any([tar_info.name.endswith(ext) for ext in filter_ext]) or \
-                   any([ tar_info.name.endswith('/'+ext) for ext in filter_dir])
-            if filt:
-                return None
-            return tar_info
-        with tempfile.NamedTemporaryFile('wb+', suffix='.tar') as tf:
-            # make a tar.gzip archive of directory
-            with tarfile.open(fileobj=tf, mode="w") as tar:
-                tar.add(self.local_dir, arcname=os.path.basename(self.local_dir), filter=filter_func)
-            tf.seek(0)
-            yield tf.name
-
 
 class MountLocal(Mount):
     """

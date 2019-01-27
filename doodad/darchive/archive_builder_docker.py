@@ -18,7 +18,6 @@ import contextlib
 import uuid
 
 import doodad
-from doodad.darchive import mount
 from doodad.utils import cmd_builder
 
 THIS_FILE_DIR = os.path.dirname(__file__)

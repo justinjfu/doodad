@@ -3,7 +3,7 @@ import os.path as path
 import tempfile
 import contextlib
 
-from doodad.launch import mode
+from doodad import mode
 from doodad.utils import TESTING_DIR
 from doodad.credentials import ssh, ec2
 

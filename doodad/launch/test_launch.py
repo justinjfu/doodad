@@ -3,10 +3,9 @@ import os.path as path
 import tempfile
 import contextlib
 
-from doodad.launch import mode
+from doodad import mode, mount
 from doodad.launch import launch_api
 from doodad.utils import TESTING_DIR
-from doodad.darchive import mount
 
 
 @contextlib.contextmanager

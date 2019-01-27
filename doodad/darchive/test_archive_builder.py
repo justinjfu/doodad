@@ -1,7 +1,8 @@
 import unittest
 import os.path as path
 
-from doodad.darchive import mount, archive_builder_docker
+from doodad import mount
+from doodad.darchive import archive_builder_docker
 from doodad.utils import TESTING_DIR
 
 
