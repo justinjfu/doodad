@@ -11,8 +11,7 @@ result = launch_api.run_command(
 import os
 
 from doodad.darchive import archive_builder_docker as archive_builder
-from doodad.darchive import mount
-from doodad.launch import mode
+from doodad import mount, mode
 
 
 def run_command(
