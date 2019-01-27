@@ -24,6 +24,7 @@ THIS_FILE_DIR = os.path.dirname(__file__)
 MAKESELF_PATH = os.path.join(THIS_FILE_DIR, 'makeself.sh')
 MAKESELF_HEADER_PATH = os.path.join(THIS_FILE_DIR, 'makeself-header.sh')
 BEGIN_HEADER = '--- BEGIN DAR OUTPUT ---'
+DAR_PAYLOAD_MOUNT = 'dar_payload'
 
 def build_archive(archive_filename='runfile.dar', 
                   docker_image='ubuntu:18.04',
@@ -78,10 +79,11 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
     mnt_cmd = ''.join([' -v %s:%s' % (mnt.sync_dir, mnt.mount_point) 
         for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
-    mnt_cmd += ' -v $(pwd):/payload'
-    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /payload;./run.sh"'.format(
+    mnt_cmd += ' -v $(pwd):/'+DAR_PAYLOAD_MOUNT
+    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /{dar_payload};./run.sh"'.format(
         img=image_name,
         mount_cmds=mnt_cmd,
+        dar_payload=DAR_PAYLOAD_MOUNT
     ))
     with open(docker_hook_file, 'w') as f:
         f.write(builder.dump_script())
@@ -127,14 +129,17 @@ def compile_archive(archive_dir, output_file, verbose=False):
     p.communicate()
     os.chmod(output_file, 0o777)
 
-def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None):
+def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None, get_output=True):
     if '/' not in filename:
         filename = './'+filename
-    p = subprocess.Popen([shell_interpreter, filename, '--quiet'], stdout=subprocess.PIPE)
-    output, errcode = p.communicate()
-    output = _strip_stdout(output.decode(encoding))
-    # strip out 
-    return output, errcode
+    stdout = subprocess.PIPE if get_output else None
+    p = subprocess.Popen([shell_interpreter, filename, '--quiet'], stdout=stdout)
+    if get_output:
+        output, errcode = p.communicate()
+        output = _strip_stdout(output.decode(encoding))
+        return output, errcode
+    else:
+        p.wait()
 
 
 def _strip_stdout(output):

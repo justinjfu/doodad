@@ -63,23 +63,29 @@ class MountLocal(Mount):
         self.cleanup = cleanup
         self.filter_ext = filter_ext
         self.filter_dir = filter_dir
+        if self.writeable:
+            if not self.mount_point.startswith('/'):
+                raise ValueError('Output mount points must be absolute')
         if mount_point is None:
             self.mount_point = self.local_dir
         else:
             assert not self.mount_point.endswith('/'), "Do not end mount points with backslash"
 
     def dar_build_archive(self, deps_dir):
-        dep_dir = os.path.join(deps_dir, 'local', self.name)
         os.makedirs(os.path.join(deps_dir, 'local'))
-        shutil.copytree(self.local_dir, dep_dir)
-
+        dep_dir = os.path.join(deps_dir, 'local', self.name)
         extract_file = os.path.join(dep_dir, 'extract.sh')
-        with open(extract_file, 'w') as f:
-            mount_point = os.path.dirname(self.mount_point)
-            f.write('mkdir -p %s\n' % mount_point)
-            #print(dep_dir) 
-            #f.write('ln -s $USER_PWD/archive/deps/local/%s %s\n' % (self.name, self.mount_point))
-            f.write('mv ./deps/local/{name} {mount}'.format(name=self.name, mount=self.mount_point))
+        mount_point = os.path.dirname(self.mount_point)
+
+        if self.read_only:
+            shutil.copytree(self.local_dir, dep_dir)
+            with open(extract_file, 'w') as f:
+                f.write('mkdir -p %s\n' % mount_point)
+                f.write('mv ./deps/local/{name} {mount}'.format(name=self.name, mount=self.mount_point))
+        else:
+            os.makedirs(dep_dir)
+            with open(extract_file, 'w') as f:
+                f.write('mkdir -p %s\n' % mount_point)
         os.chmod(extract_file, 0o777)
 
     def dar_extract_command(self):

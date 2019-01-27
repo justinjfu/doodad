@@ -1,5 +1,6 @@
 aws_config/
 *.dar
+testing/test_outputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

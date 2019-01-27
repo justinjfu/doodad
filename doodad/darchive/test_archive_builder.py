@@ -1,9 +1,12 @@
 import unittest
+import tempfile
+import os
 import os.path as path
+import shutil
 
 from doodad import mount
 from doodad.darchive import archive_builder_docker
-from doodad.utils import TESTING_DIR
+from doodad.utils import TESTING_DIR, TESTING_OUTPUT_DIR
 
 
 class TestDockerArchiveBuilder(unittest.TestCase):
@@ -60,6 +63,29 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         output, errors = archive_builder_docker.run_archive(archive, timeout=5)
         output = output.strip()
         self.assertEqual(output, 'apple')
+
+    def test_local_output(self):
+        mnts = []
+        try:
+            shutil.rmtree(TESTING_OUTPUT_DIR)
+        except OSError:
+            pass
+        temp_dir = TESTING_OUTPUT_DIR
+        os.makedirs(TESTING_OUTPUT_DIR)
+        mnts.append(mount.MountLocal(
+            local_dir=temp_dir,
+            mount_point='/mymount',
+            output=True
+        ))
+        payload_script = 'echo hello123 > /mymount/secret.txt'
+        archive = archive_builder_docker.build_archive(payload_script=payload_script,
+                                                verbose=False, 
+                                                docker_image='python:3',
+                                                mounts=mnts)
+        archive_builder_docker.run_archive(archive, timeout=5, get_output=False)
+        with open(path.join(temp_dir, 'secret.txt'), 'r') as f:
+            output = f.read()
+        self.assertEqual(output, 'hello123\n')
 
     def test_s3(self):
         """ Dry-run test for MountS3
