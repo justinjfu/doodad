@@ -1,4 +1,4 @@
-import configparser
+from six.moves import configparser
 import os
 import json
 
