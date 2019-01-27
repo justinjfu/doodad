@@ -11,12 +11,13 @@ result = launch_api.run_command(
 import os
 
 from doodad.darchive import archive_builder_docker as archive_builder
-from doodad import mount, mode
+from doodad import mount
+from doodad import mode as launch_mode
 
 
 def run_command(
         command,
-        mode=mode.LocalMode(),
+        mode=launch_mode.LocalMode(),
         mounts=tuple(),
         return_output=False,
         verbose=False,
@@ -51,7 +52,6 @@ def run_command(
 
 def run_python(
         target,
-        mode,
         target_mount_dir='target',
         mounts=tuple(),
         docker_image='python:3',
@@ -62,7 +62,6 @@ def run_python(
 
     Args:
         target (str): Path to a python script. i.e. '/home/user/hello.py'
-        mode (LaunchMode): A LaunchMode object
         target_mount_dir (str): Directory to mount the target inside container.
             Default is 'target'. Changing this is usually unnecessary.
         mounts (tuple): A list/tuple of Mount objects
@@ -80,7 +79,7 @@ def run_python(
     command = make_python_command(
         target_full_path,
     )
-    return run_command(command, mode, docker_image=docker_image, mounts=mounts, **kwargs)
+    return run_command(command, docker_image=docker_image, mounts=mounts, **kwargs)
 
 
 def make_python_command(
