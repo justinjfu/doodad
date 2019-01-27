@@ -21,8 +21,9 @@ def s3_upload(local_file_name, s3_bucket, s3_path, dry=False, region=None):
         upload_cmd = ["aws", "s3", "cp", local_file_name, remote_path]
     else:
         upload_cmd = ["aws", "s3", "cp", '--region', region, local_file_name, remote_path]
-    print(' '.join(upload_cmd))
     if not dry:
         subprocess.check_call(upload_cmd)
+    else:
+        print(' '.join(upload_cmd))
     return remote_path
 
