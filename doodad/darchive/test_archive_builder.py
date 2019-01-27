@@ -35,7 +35,6 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         ))
 
         payload_script = 'python3 ./code/doodad/test/test_import.py'
-        
         archive = archive_builder_docker.build_archive(payload_script=payload_script,
                                                 verbose=False, 
                                                 docker_image='python:3',
@@ -68,10 +67,7 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         """
         mnts = []
         mnts.append(mount.MountS3(
-            region='us-west1',
-            s3_bucket='my.bucket',
             s3_path='logs/mylogs',
-            local_dir=TESTING_DIR,
             dry=True,
         ))
         payload_script = 'echo hello123'

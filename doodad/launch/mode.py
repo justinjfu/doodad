@@ -8,6 +8,8 @@ import pprint
 from doodad.utils import shell
 from doodad.utils import safe_import
 from doodad.darchive import mount
+from doodad.apis.ec2.autoconfig import Autoconfig
+from doodad.credentials.ec2 import AWSCredentials
 
 googleapiclient = safe_import.try_import('googleapiclient')
 googleapiclient.discovery = safe_import.try_import('googleapiclient.discovery')
@@ -156,7 +158,6 @@ class EC2Mode(LaunchMode):
         sio.write('sudo mkswap {swap_location}\n'.format(swap_location=swap_location))
         sio.write('sudo chmod 600 {swap_location}\n'.format(swap_location=swap_location))
         sio.write('sudo swapon {swap_location}\n'.format(swap_location=swap_location))
-
 
         sio.write("service docker start\n")
         #sio.write("docker --config /home/ubuntu/.docker pull {docker_image}\n".format(docker_image=self.docker_image))
@@ -346,6 +347,39 @@ class EC2Mode(LaunchMode):
                     break
                 except botocore.exceptions.ClientError:
                     continue
+
+
+class EC2Autoconfig(EC2Mode):
+    def __init__(self,
+            autoconfig_file=None,
+            region='us-west-1',
+            s3_bucket=None,
+            ami_image=None,
+            aws_key_name=None,
+            iam_instance_profile_name=None,
+            **kwargs
+            ):
+        # find config file
+        autoconfig = Autoconfig(autoconfig_file)
+        s3_bucket = autoconfig.s3_bucket() if s3_bucket is None else s3_bucket
+        image_id = autoconfig.aws_image_id(region) if ami_image is None else ami_image
+        aws_key_name= autoconfig.aws_key_name(region) if aws_key_name is None else aws_key_name
+        iam_profile= autoconfig.iam_profile_name() if iam_instance_profile_name is None else iam_instance_profile_name
+        credentials=AWSCredentials(aws_key=autoconfig.aws_access_key(), aws_secret=autoconfig.aws_access_secret())
+        security_group_ids = autoconfig.aws_security_group_ids()[region]
+        security_groups = autoconfig.aws_security_groups()
+
+        super(EC2Autoconfig, self).__init__(
+                s3_bucket=s3_bucket,
+                ami_name=image_id,
+                aws_key_name=aws_key_name,
+                iam_instance_profile_name=iam_profile,
+                ec2_credentials=credentials,
+                region=region,
+                security_groups=security_groups,
+                security_group_ids=security_group_ids,
+                **kwargs
+                )
 
 
 class GCPMode(LaunchMode):

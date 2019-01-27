@@ -152,123 +152,34 @@ class MountGit(Mount):
 
 class MountS3(Mount):
     def __init__(self, 
-                region,
-                s3_bucket,
                 s3_path, 
-                local_dir=None,
                 sync_interval=15, 
-                output=False,
+                output=True,
                 dry=False,
                 include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), 
                 **kwargs):
         super(MountS3, self).__init__(output=output, **kwargs)
         # load from config
-        self.s3_bucket = s3_bucket
-        self.s3_path = s3_path
-        self.region = region
+        if s3_path.startswith('/'):
+            raise NotImplementedError('Local dir cannot be absolute')
+        else:
+            # We store everything into a fixed dir /doodad on the remote machine
+            # so GCPMode knows to simply sync /doodad
+            # (this is b/c we no longer pass in mounts to the launch mode)
+            self.sync_dir = os.path.join('/doodad', s3_path)
         self.output = output
         self.sync_interval = sync_interval
         self.sync_on_terminate = True
         self.dry = dry
         self.include_types = include_types
-        self._name = '%s.%s' % (self.s3_bucket, self.s3_path.replace('/', '.'))
-        if output is False:
-            assert local_dir is not None
-            self.local_dir = os.path.realpath(os.path.expanduser(local_dir))
-
-    def __str__(self):
-        return 'MountS3@s3://%s/%s'% (self.s3_bucket, self.s3_path)
-
-    @property
-    def include_string(self):
-        return ' '.join(['--include \'%s\''%type_ for type_ in self.include_types])
-
-    def s3_upload(self, filename, remote_filename=None, dry=False, check_exist=True):
-        if remote_filename is None:
-            remote_filename = os.path.basename(filename)
-        remote_path = 'doodad/mount/'+remote_filename
-        if check_exist and not dry:
-            if aws_util.s3_exists(self.s3_bucket, remote_path, region=self.region):
-                print('\t%s exists! ' % os.path.join(self.s3_bucket, remote_path))
-                return 's3://'+os.path.join(self.s3_bucket, remote_path)
-        return aws_util.s3_upload(filename, self.s3_bucket, remote_path, dry=dry,
-                         region=self.region)
+        self._name = self.sync_dir.replace('/', '_')
+        assert output
 
     def dar_build_archive(self, deps_dir):
-        dep_dir = os.path.join(deps_dir, 's3', self.name)
-        #os.makedirs(os.path.join(deps_dir, 's3'))
-        os.makedirs(dep_dir)
-        extract_file = os.path.join(dep_dir, 'extract.sh')
-
-        if self.output:
-            with open(extract_file, 'w') as f:
-                # f.write("mkdir -p {local_code_path}\n".format(local_code_path=mount_point))
-                f.write("mkdir -p {remote_dir}\n".format(
-                    remote_dir=self.mount_point)
-                )
-                # Sync interval
-                f.write("""
-                while /bin/true; do
-                    aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
-                    sleep {periodic_sync_interval}
-                done & echo sync initiated
-                """.format(
-                    include_string=self.include_string,
-                    log_dir=self.mount_point,
-                    s3_path=self.s3_path,
-                    periodic_sync_interval=self.sync_interval
-                ))
-
-                # Sync on terminate. This catches the case where the spot
-                # instance gets terminated before the user script ends.
-                #
-                # This is hoping that there's at least 3 seconds between when
-                # the spot instance gets marked for  termination and when it
-                # actually terminates.
-                f.write(r"""
-                    while /bin/true; do
-                        if [ -z $(curl -Is http://169.254.169.254/latest/meta-data/spot/termination-time | head -1 | grep 404 | cut -d \  -f 2) ]
-                        then
-                            logger "Running shutdown hook."
-                            aws s3 cp --recursive {log_dir} {s3_path}
-                            break
-                        else
-                            # Spot instance not yet marked for termination.
-                            # This is hoping that there's at least 3 seconds
-                            # between when the spot instance gets marked for
-                            # termination and when it actually terminates.
-                            sleep 3
-                        fi
-                    done & echo log sync initiated
-                """.format(
-                    log_dir=self.mount_point,
-                    s3_path=self.s3_path,
-                ))
-        else:
-            # first upload directory to S3
-            with self.gzip() as gzip_file:
-                gzip_path = os.path.realpath(gzip_file)
-                file_hash = utils.hash_file(gzip_path)
-                s3_path = self.s3_upload(gzip_path, remote_filename=file_hash+'.tar', dry=self.dry)
-            self.path_on_remote = s3_path
-            self.local_file_hash = gzip_path
-
-            with open(extract_file, 'w') as f:
-                remote_tar_name = '/tmp/'+file_hash+'.tar'
-                #mount_point =  os.path.join('/mounts', self.mount_point.replace('~/',''))
-                mount_point = self.mount_point
-                f.write("aws s3 cp {s3_path} {remote_tar_name}\n".format(s3_path=s3_path, remote_tar_name=remote_tar_name))
-                f.write("mkdir -p {local_code_path}\n".format(local_code_path=mount_point))
-                f.write("tar -xvf {remote_tar_name} -C {local_code_path}\n".format(
-                    local_code_path=mount_point,
-                    remote_tar_name=remote_tar_name))
-        os.chmod(extract_file, 0o777)
+        return 
 
     def dar_extract_command(self):
-        # execute the script to pull from S3
-        return './deps/s3/{name}/extract.sh'.format(
-            name=self.name,
-        )
+        return 'echo helloMountEC2'
 
 
 class MountGCP(Mount):
