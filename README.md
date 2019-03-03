@@ -1,16 +1,18 @@
 # doodad
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Build Status](https://travis-ci.com/justinjfu/doodad.svg?branch=master)](https://travis-ci.com/justinjfu/doodad)
 [![codecov](https://codecov.io/gh/justinjfu/doodad/branch/master/graph/badge.svg)](https://codecov.io/gh/justinjfu/doodad)
 
-
 A library for packaging dependencies and launching scripts (with a focus on python) on different platforms using Docker.
-Currently supported platforms include EC2, GCP, and remotely via SSH.
+Currently supported platforms include AWS, GCP, and remotely via SSH.
 
-doodad is designed to be as minimally invasive in your code as possible. 
+doodad is designed to be as minimally invasive as possible - most code can be run without any modifications.
+
+See the [quickstart](https://github.com/justinjfu/doodad/wiki/Quickstart) guide for a quick tutorial.
 
 ## Setup
-- Install python 2 or python 3. doodad is tested to work with python2.7 and python3.6 on Unix systems.
+- Install Python 2 or Python 3. doodad currently supports both.
 
 - Install [Docker CE](https://docs.docker.com/engine/installation/).
 
@@ -29,29 +31,21 @@ pip install -r requirements.txt
 python scripts/ec2_setup.py
 ```
 
-## Tutorial
-A simple hello world program:
+## Example
+Launching commands is very simple with doodad. The following script will launch a docker container and execute the command `echo helloworld`:
+
 ```python
 from doodad.launch import launch_api
 
-launch_api.run_command(
-    command='echo helloworld',
-)
+launch_api.run_command('echo helloworld')
 ```
-This will launch a docker container and execute the command `echo helloworld`.
 
-Launching a python program:
+To launch a python program, specify the path to the script.
 ```python
 from doodad.launch import launch_api
 
-launch_api.run_python(
-    target='path/to/my/python/script.py',
-)
+launch_api.run_python('path/to/my/python/script.py')
 ```
-This will launch a docker container and execute the python script.
-
-
-See the [wiki](https://github.com/justinjfu/doodad/wiki/Home) and [quickstart](https://github.com/justinjfu/doodad/wiki/Quickstart) guide for more details on how to package dependencies, and run programs remotely.
 
 ## Misc
 
