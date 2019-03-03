@@ -128,5 +128,14 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         output = output.strip()
         self.assertEqual(output, 'hello123')
 
+    def test_cli_args(self):
+        payload_script = 'echo hi'
+        archive = archive_builder_docker.build_archive(payload_script=payload_script,
+                                                verbose=True, 
+                                                docker_image='python:3')
+        output, errors = archive_builder_docker.run_archive(archive, cli_args='--help', timeout=5)
+        output = output.strip()
+        self.assertEqual(output, 'hi --help')
+
 if __name__ == '__main__':
     unittest.main()

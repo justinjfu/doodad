@@ -17,6 +17,7 @@ from doodad import mode as launch_mode
 
 def run_command(
         command,
+        cli_args=None,
         mode=launch_mode.LocalMode(),
         mounts=tuple(),
         return_output=False,
@@ -28,6 +29,7 @@ def run_command(
 
     Args:
         command (str): A shell command
+        cli_args (str): Command line args to pass
         mode (LaunchMode): A LaunchMode object
         mounts (tuple): A list/tuple of Mount objects
         return_output (bool): If True, returns stdout as a string.
@@ -43,7 +45,10 @@ def run_command(
                                                 verbose=False, 
                                                 docker_image=docker_image,
                                                 mounts=mounts)
-        result = mode.run_script(archive, return_output=return_output, verbose=verbose)
+        cmd = archive
+        if cli_args:
+            cmd = archive + ' -- ' + cli_args
+        result = mode.run_script(cmd, return_output=return_output, verbose=verbose)
     if return_output:
         result = archive_builder._strip_stdout(result)
 

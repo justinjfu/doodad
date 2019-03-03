@@ -80,7 +80,7 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
         for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/'+DAR_PAYLOAD_MOUNT
-    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /{dar_payload};./run.sh"'.format(
+    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /{dar_payload};./run.sh $@"'.format(
         img=image_name,
         mount_cmds=mnt_cmd,
         dar_payload=DAR_PAYLOAD_MOUNT
@@ -95,6 +95,7 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     builder.append('#!/bin/bash')
     if verbose:
         builder.echo('Running Doodad Archive [DAR] $1')
+        builder.echo('CLI Args: $@')
         builder.echo('DAR build information:')
         builder.append('cat', './METADATA')
 
@@ -106,7 +107,7 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
             builder.append('export PYTHONPATH=$PYTHONPATH:%s' % mount.mount_point)
     if verbose:
         builder.append('echo', BEGIN_HEADER)
-    builder.append(payload_script)
+    builder.append(payload_script + ' $@')
 
     with open(runfile, 'w') as f:
         f.write(builder.dump_script())
@@ -129,11 +130,11 @@ def compile_archive(archive_dir, output_file, verbose=False):
     p.communicate()
     os.chmod(output_file, 0o777)
 
-def run_archive(filename, encoding='utf-8', shell_interpreter='sh', timeout=None, get_output=True):
+def run_archive(filename, cli_args='', encoding='utf-8', shell_interpreter='sh', timeout=None, get_output=True):
     if '/' not in filename:
         filename = './'+filename
     stdout = subprocess.PIPE if get_output else None
-    p = subprocess.Popen([shell_interpreter, filename, '--quiet'], stdout=stdout)
+    p = subprocess.Popen([shell_interpreter, filename, '--quiet', '--', cli_args], stdout=stdout)
     if get_output:
         output, errcode = p.communicate()
         output = _strip_stdout(output.decode(encoding))
