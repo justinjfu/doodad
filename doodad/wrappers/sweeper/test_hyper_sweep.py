@@ -30,6 +30,17 @@ class TestDoodadSweep(unittest.TestCase):
     def setUp(self):
         self.sweeper = launcher.DoodadSweeper()
 
+    def test_single_exec(self):
+        args = {
+            'n': [1,3,5,7]
+        }
+        output = self.sweeper.run_test_local(
+            target=SWEEPER_TEST_FILE,
+            params=args,
+            return_output=True
+        )
+        self.assertEqual(output, ('1\n',))
+
     def test_local_sweep(self):
         args = {
             'n': [1,3,5,7]
@@ -53,4 +64,4 @@ class TestDoodadSweep(unittest.TestCase):
             num_chunks=2,
             confirm=False,
         )
-        self.assertEqual(output, ('5\n3\n', '1\n7\n'))
+        self.assertEqual(output, ('3\n5\n', '1\n7\n'))

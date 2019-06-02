@@ -42,7 +42,7 @@ def chunker(sweeper, num_chunks=10, confirm=True):
     chunks = [ [] for _ in range(num_chunks) ]
     print('computing chunks')
     configs = [config for config in sweeper]
-    random.shuffle(configs)
+    random.shuffle(configs, random.random)
     for i, config in enumerate(configs):
         chunks[i % num_chunks].append(config)
     print('num chunks:  ', num_chunks)
