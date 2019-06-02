@@ -80,7 +80,7 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
         for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/'+DAR_PAYLOAD_MOUNT
-    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /{dar_payload};./run.sh $@"'.format(
+    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
         img=image_name,
         mount_cmds=mnt_cmd,
         dar_payload=DAR_PAYLOAD_MOUNT
@@ -95,7 +95,7 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     builder.append('#!/bin/bash')
     if verbose:
         builder.echo('Running Doodad Archive [DAR] $1')
-        builder.echo('CLI Args: $@')
+        builder.echo('CLI Args: $*')
         builder.echo('DAR build information:')
         builder.append('cat', './METADATA')
 
@@ -107,7 +107,7 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
             builder.append('export PYTHONPATH=$PYTHONPATH:%s' % mount.mount_point)
     if verbose:
         builder.append('echo', BEGIN_HEADER)
-    builder.append(payload_script + ' $@')
+    builder.append(payload_script + ' $*')
 
     with open(runfile, 'w') as f:
         f.write(builder.dump_script())

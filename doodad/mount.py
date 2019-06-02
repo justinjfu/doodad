@@ -72,7 +72,7 @@ class MountLocal(Mount):
             assert not self.mount_point.endswith('/'), "Do not end mount points with backslash"
 
     def dar_build_archive(self, deps_dir):
-        os.makedirs(os.path.join(deps_dir, 'local'))
+        os.makedirs(os.path.join(deps_dir, 'local'), exist_ok=True)
         dep_dir = os.path.join(deps_dir, 'local', self.name)
         extract_file = os.path.join(dep_dir, 'extract.sh')
         mount_point = os.path.dirname(self.mount_point)

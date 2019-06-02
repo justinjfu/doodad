@@ -21,12 +21,14 @@ import random
 from datetime import datetime
 import hashlib
 import doodad
+from doodad import mount
+from doodad.launch import launch_api
+from doodad.darchive import archive_builder_docker as archive_builder
 
 
 class Sweeper(object):
     def __init__(self, hyper_config):
         self.hyper_config = hyper_config
-        self.include_name=include_name
 
     def __iter__(self):
         count = 0
@@ -36,62 +38,72 @@ class Sweeper(object):
             yield kwargs
 
 
-def chunker(sweeper, num_chunks=10):
-    chunks = [ [] for _ in range(num_chunks) ]
-    print('computing chunks')
-    configs = [config for config in sweeper]
-    random.shuffle(configs)
-    for i, config in enumerate(configs):
-        chunks[i % num_chunks].append(config)
-    print('num chunks:  ', num_chunks)
-    print('chunk sizes: ', [len(chunk) for chunk in chunks])
-    print('total jobs:  ', sum([len(chunk) for chunk in chunks]))
-    print('continue?(y/n)')
-    resp = str(input())
-    if resp == 'y':
-        return chunks
-    else:
-        return []
+def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_image='python:3', return_output=False):
 
+    # build archive
+    target_dir = os.path.dirname(target)
+    target_mount_dir = os.path.join('target', os.path.basename(target_dir))
+    target_mount = mount.MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
+    mounts = list(mounts) + [target_mount]
+    target_full_path = os.path.join(target_mount.mount_point, os.path.basename(target))
+    command = launch_api.make_python_command(
+        target_full_path
+    )
 
-def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_image='python:3'):
-    sweeper = Sweeper(params)
-    for config in sweeper:
-        #TODO(Justin): don't rebuild the archive each time.
-        doodad.launch.run_python(
-                target=target,
-                mode=run_mode,
-                docker_image=docker_image,
-                mount_points=mounts,
-                cli_args=' '.join(['--%s %s' % (key, config[key]) for key in config]),
-        )
-        if test_one:
-            break
+    results = []
+    with archive_builder.temp_archive_file() as archive_file:
+        archive = archive_builder.build_archive(archive_filename=archive_file,
+                                                payload_script=command,
+                                                verbose=False, 
+                                                docker_image=docker_image,
+                                                mounts=mounts)
+
+        sweeper = Sweeper(params)
+        for config in sweeper:
+            cli_args= ' '.join(['--%s %s' % (key, config[key]) for key in config])
+            cmd = archive + ' -- ' + cli_args
+            result = run_mode.run_script(cmd, return_output=return_output, verbose=False)
+            if return_output:
+                result = archive_builder._strip_stdout(result)
+                results.append(result)
+            if test_one:
+                break
+    return tuple(results)
 
 
 def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, docker_image='python:3'):
-    sweeper = Sweeper(params)
-    chunks = chunker(sweeper, num_chunks)
-    for chunk in chunks:
-        command = ''
-        for config in chunk:
-            cli_args=' '.join(['--%s %s' % (key, config[key]) for key in config]),
-            command += '%s %s;' % (target, cli_args)
-        doodad.launch.run_command(
-                command=command,
-                mode=run_mode,
-                docker_image=docker_image,
-                mount_points=mounts,
-        )
-
-
-def run_single_doodad(target, kwargs, run_mode, mounts, docker_image='python:3'):
-    """ Run a single function via doodad """
-    doodad.launch_python(
-            target = target,
-            mode=run_mode,
-            mount_points=mounts,
-            python_cmd=python_cmd,
-            cli_args=' '.join(['--%s %s' % (key, kwargs[key]) for key in kwargs]),
+    # build archive
+    target_dir = os.path.dirname(target)
+    target_mount_dir = os.path.join('target', os.path.basename(target_dir))
+    target_mount = mount.MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
+    mounts = list(mounts) + [target_mount]
+    target_full_path = os.path.join(target_mount.mount_point, os.path.basename(target))
+    command = launch_api.make_python_command(
+        target_full_path
     )
+
+    results = []
+    with archive_builder.temp_archive_file() as archive_file:
+        archive = archive_builder.build_archive(archive_filename=archive_file,
+                                                payload_script=command,
+                                                verbose=False, 
+                                                docker_image=docker_image,
+                                                mounts=mounts)
+
+        sweeper = Sweeper(params)
+        chunks = chunker(sweeper, num_chunks)
+        for chunk in chunks:
+            command = ''
+            for config in chunk:
+                cli_args=' '.join(['--%s %s' % (key, config[key]) for key in config])
+                single_command = archive + ' -- ' + cli_args
+                command += '%s;' % single_command
+
+            result = run_mode.run_script(command, return_output=return_output, verbose=False)
+            if return_output:
+                result = archive_builder._strip_stdout(result)
+                results.append(result)
+            if test_one:
+                break
+    return tuple(results)
 

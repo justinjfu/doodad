@@ -69,6 +69,14 @@ class TestLaunchAPI(unittest.TestCase):
         )
         self.assertEqual(result.strip(), '--help')
 
+        result = launch_api.run_command(
+            'echo',
+            cli_args='--help --help2',
+            mode=launcher,
+            return_output=True
+        )
+        self.assertEqual(result.strip(), '--help --help2')
+
     def test_run_python(self):
         launcher = mode.LocalMode()
         result = launch_api.run_python(

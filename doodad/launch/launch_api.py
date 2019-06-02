@@ -71,7 +71,7 @@ def run_python(
             Default is 'target'. Changing this is usually unnecessary.
         mounts (tuple): A list/tuple of Mount objects
         **kwargs: Arguments to run_command
-    
+
     Returns:
         A string output if return_output is True,
         else None
@@ -93,3 +93,4 @@ def make_python_command(
     ):
     cmd = '%s %s' % (python_cmd, target)
     return cmd
+
