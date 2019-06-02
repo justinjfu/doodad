@@ -5,7 +5,7 @@ import doodad
 import doodad.mode
 import doodad.mount as mount
 from doodad.utils import REPO_DIR
-from doodad.wrappers.sweeper.hyper_sweep import run_sweep_doodad  
+from doodad.wrappers.sweeper import hyper_sweep
 
 
 
@@ -40,15 +40,22 @@ class DoodadSweeper(object):
     def run_test_local(self, target, params, extra_mounts=None, **kwargs):
         if extra_mounts is None:
             extra_mounts = []
-        return run_sweep_doodad(target, params, run_mode=self.mode_local,
+        return hyper_sweep.run_sweep_doodad(target, params, run_mode=self.mode_local,
                          docker_image=self.image,
                          mounts=self.mounts+[self.mount_out_local]+extra_mounts,
                          test_one=True, **kwargs)
 
-    def run_sweep_local(self, target, params, extra_mounts=None, **kwargs):
+    def run_sweep_local(self, target, params, extra_mounts=None, num_chunks=-1, **kwargs):
         if extra_mounts is None:
             extra_mounts = []
-        return run_sweep_doodad(target, params, run_mode=self.mode_local,
+        if num_chunks > 0:
+            return hyper_sweep.run_sweep_doodad_chunked(target, params, run_mode=self.mode_local,
+                         docker_image=self.image,
+                         mounts=self.mounts+[self.mount_out_local]+extra_mounts,
+                         num_chunks=num_chunks,
+                         **kwargs)
+        else:
+            return hyper_sweep.run_sweep_doodad(target, params, run_mode=self.mode_local,
                          docker_image=self.image,
                          mounts=self.mounts+[self.mount_out_local]+extra_mounts,
                          **kwargs)
@@ -56,7 +63,7 @@ class DoodadSweeper(object):
     def run_sweep_gcp(self, target, params, 
                       log_prefix=None, add_date_to_logname=True,
                       region='us-west1-a', instance_type='n1-standard-4', args=None,
-                      extra_mounts=None, **kwargs):
+                      extra_mounts=None, num_chunks=-1, **kwargs):
         if extra_mounts is None:
             extra_mounts = []
         if log_prefix is None:
@@ -74,9 +81,17 @@ class DoodadSweeper(object):
             gcp_image=self.gcp_image,
             gcp_image_project=self.gcp_project
         )
-        run_sweep_doodad(target, params, 
-                run_mode=mode_ec2, 
-                docker_image=self.image,
-                mounts=self.mounts+[self.mount_out_gcp]+extra_mounts, 
-                **kwargs)
+        if num_chunks > 0:
+            hyper_sweep.run_sweep_doodad_chunked(target, params, 
+                    run_mode=mode_ec2, 
+                    docker_image=self.image,
+                    num_chunks=num_chunks,
+                    mounts=self.mounts+[self.mount_out_gcp]+extra_mounts, 
+                    **kwargs)
+        else:
+            hyper_sweep.run_sweep_doodad(target, params, 
+                    run_mode=mode_ec2, 
+                    docker_image=self.image,
+                    mounts=self.mounts+[self.mount_out_gcp]+extra_mounts, 
+                    **kwargs)
 

@@ -38,6 +38,28 @@ class Sweeper(object):
             yield kwargs
 
 
+def chunker(sweeper, num_chunks=10, confirm=True):
+    chunks = [ [] for _ in range(num_chunks) ]
+    print('computing chunks')
+    configs = [config for config in sweeper]
+    random.shuffle(configs)
+    for i, config in enumerate(configs):
+        chunks[i % num_chunks].append(config)
+    print('num chunks:  ', num_chunks)
+    print('chunk sizes: ', [len(chunk) for chunk in chunks])
+    print('total jobs:  ', sum([len(chunk) for chunk in chunks]))
+
+    resp = 'y'
+    if confirm:
+        print('continue?(y/n)')
+        resp = str(input())
+
+    if resp == 'y':
+        return chunks
+    else:
+        return []
+
+
 def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_image='python:3', return_output=False):
 
     # build archive
@@ -71,7 +93,7 @@ def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_im
     return tuple(results)
 
 
-def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, docker_image='python:3'):
+def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, docker_image='python:3', return_output=False, test_one=False, confirm=True):
     # build archive
     target_dir = os.path.dirname(target)
     target_mount_dir = os.path.join('target', os.path.basename(target_dir))
@@ -91,7 +113,7 @@ def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, do
                                                 mounts=mounts)
 
         sweeper = Sweeper(params)
-        chunks = chunker(sweeper, num_chunks)
+        chunks = chunker(sweeper, num_chunks, confirm=confirm)
         for chunk in chunks:
             command = ''
             for config in chunk:
