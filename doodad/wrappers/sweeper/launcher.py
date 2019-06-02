@@ -46,6 +46,9 @@ class DoodadSweeper(object):
                          test_one=True, **kwargs)
 
     def run_sweep_local(self, target, params, extra_mounts=None, num_chunks=-1, **kwargs):
+        """
+        Run a grid search locally
+        """
         if extra_mounts is None:
             extra_mounts = []
         if num_chunks > 0:
@@ -64,6 +67,9 @@ class DoodadSweeper(object):
                       log_prefix=None, add_date_to_logname=True,
                       region='us-west1-a', instance_type='n1-standard-4', args=None,
                       extra_mounts=None, num_chunks=-1, **kwargs):
+        """
+        Run a grid search on GCP
+        """
         if extra_mounts is None:
             extra_mounts = []
         if log_prefix is None:

@@ -1,4 +1,5 @@
 import os
+import errno
 import hashlib
 
 _UTILS_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -19,3 +20,12 @@ def hash_file(filename):
                 break
             hasher.update(data)
     return hasher.hexdigest()
+
+
+def makedirs(path):
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
