@@ -78,7 +78,7 @@ class DoodadSweeper(object):
             datestamp = datetime.now().strftime('%Y_%m_%d')
             log_prefix = '%s_%s' % (datestamp, log_prefix)
 
-        mode_ec2 = doodad.mode.GCPDocker(
+        mode_ec2 = doodad.mode.GCPMode(
             gcp_bucket=self.gcp_bucket_name,
             gcp_log_path=os.path.join('doodad/logs', log_prefix),
             gcp_project=self.gcp_project,

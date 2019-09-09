@@ -80,7 +80,7 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
         for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/'+DAR_PAYLOAD_MOUNT
-    builder.append('docker run -i {mount_cmds} --user $UID {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
+    builder.append('docker run {mount_cmds} -t {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
         img=image_name,
         mount_cmds=mnt_cmd,
         dar_payload=DAR_PAYLOAD_MOUNT

@@ -85,7 +85,7 @@ class TestLaunchAPI(unittest.TestCase):
             mode=launcher,
             return_output=True
         )
-        self.assertEqual(result, '--arg1\na\n--arg2\nb\n')
+        self.assertEqual(result.splitlines(), ['--arg1', 'a', '--arg2', 'b'])
 
     def test_run_python(self):
         launcher = mode.LocalMode()

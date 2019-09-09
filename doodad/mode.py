@@ -433,7 +433,8 @@ class GCPMode(LaunchMode):
             raise NotImplementedError()
 
         # Upload script to GCS
-        remote_script = gcp_util.upload_file_to_gcp_storage(self.gcp_bucket, script, dry=dry)
+        script_fname = script.split(' ')[0]
+        remote_script = gcp_util.upload_file_to_gcp_storage(self.gcp_bucket, script_fname, dry=dry)
 
         exp_name = "{}-{}".format(self.gcp_label, gcp_util.make_timekey())
         exp_prefix = self.gcp_label

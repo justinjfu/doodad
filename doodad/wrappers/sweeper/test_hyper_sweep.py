@@ -39,7 +39,7 @@ class TestDoodadSweep(unittest.TestCase):
             params=args,
             return_output=True
         )
-        self.assertEqual(output, ('1\n',))
+        self.assertEqual(tuple(x.strip() for x in output), ('1',))
 
     def test_local_sweep(self):
         args = {
@@ -50,7 +50,7 @@ class TestDoodadSweep(unittest.TestCase):
             params=args,
             return_output=True
         )
-        self.assertEqual(output, ('1\n', '3\n', '5\n', '7\n'))
+        self.assertEqual(tuple(x.strip() for x in output), ('1', '3', '5', '7'))
 
     def test_local_chunked_sweep(self):
         args = {
@@ -64,4 +64,4 @@ class TestDoodadSweep(unittest.TestCase):
             num_chunks=2,
             confirm=False,
         )
-        self.assertEqual(output, ('3\n5\n', '1\n7\n'))
+        self.assertEqual(tuple(x.splitlines() for x in output), (['3','5'], ['1','7']))
