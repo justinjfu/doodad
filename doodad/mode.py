@@ -4,6 +4,7 @@ import uuid
 import six
 import base64
 import pprint
+import shlex
 
 from doodad.utils import shell
 from doodad.utils import safe_import
@@ -50,6 +51,9 @@ class LaunchMode(object):
     def _get_run_command(self, script_filename):
         raise NotImplementedError()
 
+    def print_launch_message(self):
+        pass
+
 
 class LocalMode(LaunchMode):
     """
@@ -57,6 +61,9 @@ class LocalMode(LaunchMode):
     """
     def __init__(self, **kwargs):
         super(LocalMode, self).__init__(**kwargs)
+
+    def __str__(self):
+        return 'LocalMode'
 
     def _get_run_command(self, script_filename):
         return '%s %s' % (self.shell_interpreter, script_filename)
@@ -428,12 +435,23 @@ class GCPMode(LaunchMode):
         self.gcp_label = gcp_label
         self.compute = googleapiclient.discovery.build('compute', 'v1')
 
+    def __str__(self):
+        return 'GCP-%s-%s' % (self.gcp_project, self.instance_type)
+
+    def print_launch_message(self):
+        print('Go to https://console.cloud.google.com/compute to monitor jobs.')
+
     def run_script(self, script, dry=False, return_output=False, verbose=False):
         if return_output:
             raise NotImplementedError()
 
         # Upload script to GCS
-        script_fname = script.split(' ')[0]
+        cmd_split = shlex.split(script)
+        script_fname = cmd_split[0]
+        if len(cmd_split) > 1:
+            script_args = ' '.join(cmd_split[1:])
+        else:
+            script_args = ''
         remote_script = gcp_util.upload_file_to_gcp_storage(self.gcp_bucket, script_fname, dry=dry)
 
         exp_name = "{}-{}".format(self.gcp_label, gcp_util.make_timekey())
@@ -451,6 +469,7 @@ class GCPMode(LaunchMode):
             'bucket_name': self.gcp_bucket,
             'terminate': json.dumps(self.terminate_on_end),
             'use_gpu': self.use_gpu,
+            'script_args': script_args,
             'startup-script': start_script,
             'shutdown-script': stop_script
         }

@@ -60,7 +60,7 @@ def chunker(sweeper, num_chunks=10, confirm=True):
         return []
 
 
-def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_image='python:3', return_output=False):
+def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_image='python:3', return_output=False, verbose=False):
 
     # build archive
     target_dir = os.path.dirname(target)
@@ -72,16 +72,19 @@ def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_im
         target_full_path
     )
 
+    print('Launching jobs with mode %s' % run_mode)
     results = []
+    njobs = 0
     with archive_builder.temp_archive_file() as archive_file:
         archive = archive_builder.build_archive(archive_filename=archive_file,
                                                 payload_script=command,
-                                                verbose=False, 
+                                                verbose=verbose, 
                                                 docker_image=docker_image,
                                                 mounts=mounts)
 
         sweeper = Sweeper(params)
         for config in sweeper:
+            njobs += 1
             cli_args= ' '.join(['--%s %s' % (key, config[key]) for key in config])
             cmd = archive + ' -- ' + cli_args
             result = run_mode.run_script(cmd, return_output=return_output, verbose=False)
@@ -90,10 +93,12 @@ def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_im
                 results.append(result)
             if test_one:
                 break
+    print('Launching completed for %d jobs' % njobs)
+    run_mode.print_launch_message()
     return tuple(results)
 
 
-def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, docker_image='python:3', return_output=False, test_one=False, confirm=True):
+def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, docker_image='python:3', return_output=False, test_one=False, confirm=True, verbose=False):
     # build archive
     target_dir = os.path.dirname(target)
     target_mount_dir = os.path.join('target', os.path.basename(target_dir))
@@ -104,11 +109,13 @@ def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, do
         target_full_path
     )
 
+    print('Launching jobs with mode %s' % run_mode)
     results = []
+    njobs = 0
     with archive_builder.temp_archive_file() as archive_file:
         archive = archive_builder.build_archive(archive_filename=archive_file,
                                                 payload_script=command,
-                                                verbose=False, 
+                                                verbose=verbose, 
                                                 docker_image=docker_image,
                                                 mounts=mounts)
 
@@ -117,6 +124,7 @@ def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, do
         for chunk in chunks:
             command = ''
             for config in chunk:
+                njobs += 1
                 cli_args=' '.join(['--%s %s' % (key, config[key]) for key in config])
                 single_command = archive + ' -- ' + cli_args
                 command += '%s;' % single_command
@@ -127,5 +135,7 @@ def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, do
                 results.append(result)
             if test_one:
                 break
+    print('Launching completed for %d jobs on %d machines' % (njobs, num_chunks))
+    run_mode.print_launch_message()
     return tuple(results)
 

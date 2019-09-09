@@ -76,15 +76,22 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False):
     docker_hook_file = os.path.join(arch_dir, 'docker.sh')
     builder = cmd_builder.CommandBuilder()
     builder.append('#!/bin/bash')
+    #if verbose:
+    #    builder.echo('All script arguments:')
+    #    builder.echo('$@')
     mnt_cmd = ''.join([' -v %s:%s' % (mnt.sync_dir, mnt.mount_point) 
         for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/'+DAR_PAYLOAD_MOUNT
-    builder.append('docker run {mount_cmds} -t {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
+    docker_cmd = ('docker run {mount_cmds} -t {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
         img=image_name,
         mount_cmds=mnt_cmd,
         dar_payload=DAR_PAYLOAD_MOUNT
     ))
+    if verbose:
+        builder.echo('Docker command:' + docker_cmd)
+    builder.append(docker_cmd)
+
     with open(docker_hook_file, 'w') as f:
         f.write(builder.dump_script())
     os.chmod(docker_hook_file, 0o777)

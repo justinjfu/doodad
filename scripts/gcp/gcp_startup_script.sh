@@ -8,6 +8,7 @@ query_metadata() {
     bucket_name=$(query_metadata bucket_name)
     shell_interpreter=$(query_metadata shell_interpreter)
     remote_script_path=$(query_metadata remote_script_path)
+    script_args=$(query_metadata script_args)
     use_gpu=$(query_metadata use_gpu)
     terminate=$(query_metadata terminate)
     gcp_bucket_path=$(query_metadata gcp_bucket_path)
@@ -16,6 +17,7 @@ query_metadata() {
     echo "gcp_bucket_path:" $gcp_bucket_path
     echo "shell_interpreter:" $shell_interpreter
     echo "remote_script:" $remote_script_path
+    echo "script_args:" $script_args
     echo "use_gpu:" $use_gpu
     echo "terminate:" $terminate
     echo "instance_name:" $instance_name
@@ -42,6 +44,7 @@ query_metadata() {
     # sync mount
     # Because GCPMode has no idea where the mounts are (the archive has them)
     # we just make the archive store everything into /doodad
+    mkdir -p /doodad
     while /bin/true; do
         gsutil -m rsync -r /doodad gs://$bucket_name/$gcp_bucket_path/logs
         sleep 15
@@ -65,7 +68,7 @@ query_metadata() {
 
     #echo $run_script_cmd >> run_script_cmd.sh
     #bash run_script_cmd.sh
-    $shell_interpreter /tmp/remote_script.sh
+    $shell_interpreter /tmp/remote_script.sh $script_args
 
     if [ "$terminate" = "true" ]; then
         echo "Finished experiment. Terminating"
