@@ -71,6 +71,15 @@ class MountLocal(Mount):
         else:
             assert not self.mount_point.endswith('/'), "Do not end mount points with backslash"
 
+    def ignore_patterns(self, dirname, contents):
+        to_ignore = []
+        for content in contents:
+            if any([content.endswith(ext) for ext in self.filter_ext]):
+                to_ignore.append(content)
+            elif any([content == _dirname for _dirname in self.filter_dir]):
+                to_ignore.append(content)
+        return to_ignore
+
     def dar_build_archive(self, deps_dir):
         utils.makedirs(os.path.join(deps_dir, 'local'))
         dep_dir = os.path.join(deps_dir, 'local', self.name)
@@ -78,7 +87,7 @@ class MountLocal(Mount):
         mount_point = os.path.dirname(self.mount_point)
 
         if self.read_only:
-            shutil.copytree(self.local_dir, dep_dir)
+            shutil.copytree(self.local_dir, dep_dir, ignore=self.ignore_patterns)
             with open(extract_file, 'w') as f:
                 f.write('mkdir -p %s\n' % mount_point)
                 f.write('mv ./deps/local/{name} {mount}'.format(name=self.name, mount=self.mount_point))
