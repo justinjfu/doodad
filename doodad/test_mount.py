@@ -22,6 +22,8 @@ class TestLocal(unittest.TestCase):
         local_mount = mount.MountLocal('dummy', filter_ext=['.pyc'], filter_dir=('foo',))
         try:
             shutil.copytree(source_dir, target_dir, ignore=local_mount.ignore_patterns)
+            print('SOURCE_DIR:', os.listdir(source_dir))
+            print('TARGET_DIR:', os.listdir(target_dir))
             self.assertEqual({'a.txt', 'bar'}, set(os.listdir(target_dir)))
         finally:
             shutil.rmtree(target_dir)

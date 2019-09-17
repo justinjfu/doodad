@@ -54,7 +54,7 @@ class MountLocal(Mount):
     """
     def __init__(self, local_dir, mount_point=None, cleanup=True,
                 filter_ext=('.pyc', '.log', '.git', '.mp4'),
-                filter_dir=('data',),
+                filter_dir=('data', '.git'),
                 **kwargs):
         super(MountLocal, self).__init__(mount_point=mount_point, **kwargs)
         self.local_dir = os.path.realpath(os.path.expanduser(local_dir))
