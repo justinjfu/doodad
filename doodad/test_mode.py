@@ -26,3 +26,25 @@ class TestSSH(unittest.TestCase):
             "scp -r myscript.sh a@b.com:./tmp_script.sh;ssh a@b.com 'bashy ./tmp_script.sh';ssh a@b.com 'rm ./tmp_script.sh'"
         )
 
+class TestEC2(unittest.TestCase):
+    def test_dry(self):
+        credentials = ec2.AWSCredentials(aws_key='123', aws_secret='abc')
+        launcher = mode.EC2Mode(
+            ec2_credentials=credentials,
+            s3_bucket='test.bucket',
+            s3_log_path='test_log_path'
+        )
+        launcher.run_script('test_script.sh', dry=True)
+
+    def test_autoconfig_dry(self):
+        credentials = ec2.AWSCredentials(aws_key='123', aws_secret='abc')
+        launcher = mode.EC2Autoconfig(
+            autoconfig_file=path.join(TESTING_DIR, 'aws_config.ini'),
+            s3_bucket='test.bucket',
+            s3_log_path='test_log_path',
+            region='us-west-2'
+        )
+        launcher.run_script('test_script.sh', dry=True)
+        self.assertEqual(launcher.ami, 'ami-1111111111112west')
+        self.assertEqual(launcher.aws_key_name, 'doodad-us-west-2')
+

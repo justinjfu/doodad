@@ -100,7 +100,6 @@ class EC2Mode(LaunchMode):
                  swap_size=4096,
                  **kwargs):
         super(EC2Mode, self).__init__(**kwargs)
-        raise NotImplementedError("EC2 is not implemented.")
         self.credentials = ec2_credentials
         self.s3_bucket = s3_bucket
         self.s3_log_path = s3_log_path
@@ -124,6 +123,8 @@ class EC2Mode(LaunchMode):
         return '\n'.join(lines)
 
     def run_script(self, script_name, dry=False, return_output=False, verbose=False):
+        if not dry:
+            raise NotImplementedError("EC2 is not implemented.")
         assert not return_output
 
         default_config = dict(
