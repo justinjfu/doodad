@@ -36,8 +36,17 @@ class SSHCredentials(object):
         return prefix + " '%s'"%cmd
 
     def get_ssh_script_cmd(self, script_name, shell_interpreter='bash'):
-        cmd = self.get_ssh_cmd_prefix()
-        cmd += "'%s -s' < %s" % (shell_interpreter, script_name)
+        # The following does not work with archive scripts
+        # cmd = self.get_ssh_cmd_prefix()
+        # cmd += "'%s -s' < %s" % (shell_interpreter, script_name)
+        cmd = "{scp_cmd};" + \
+              "{ssh_cmd}'{shell_interpreter} ./tmp_script.sh';" + \
+              "{ssh_cmd}'rm ./tmp_script.sh'" 
+        cmd = cmd.format(
+            scp_cmd=self.get_scp_cmd(script_name, './tmp_script.sh', src_remote=False),
+            ssh_cmd=self.get_ssh_cmd_prefix(),
+            shell_interpreter=shell_interpreter
+        )
         return cmd
 
     def get_scp_cmd(self, source, destination, src_remote=True, recursive=True):
