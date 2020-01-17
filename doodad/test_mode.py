@@ -23,9 +23,8 @@ class TestSSH(unittest.TestCase):
         launcher = mode.SSHMode(credentials, shell_interpreter='bashy')
         self.assertEqual(
             launcher._get_run_command('myscript.sh'),
-            'ssh a@b.com \'bashy -s\' < myscript.sh'
+            "scp -r myscript.sh a@b.com:./tmp_script.sh;ssh a@b.com 'bashy ./tmp_script.sh';ssh a@b.com 'rm ./tmp_script.sh'"
         )
-
 
 class TestEC2(unittest.TestCase):
     def test_dry(self):
@@ -48,3 +47,4 @@ class TestEC2(unittest.TestCase):
         launcher.run_script('test_script.sh', dry=True)
         self.assertEqual(launcher.ami, 'ami-1111111111112west')
         self.assertEqual(launcher.aws_key_name, 'doodad-us-west-2')
+

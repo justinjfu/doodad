@@ -41,12 +41,15 @@ class LaunchMode(object):
             verbose (bool): Verbose mode
             return_output (bool): If True, returns stdout from the script as a string.
         """
+        run_cmd = self._get_run_command(script_filename)
+        if verbose:
+            print('Executing command:', run_cmd)
         if return_output:
-            output = shell.call_and_get_output(self._get_run_command(script_filename), shell=True, dry=dry)
+            output = shell.call_and_get_output(run_cmd, shell=True, dry=dry)
             if output:
                 return output.decode('utf-8')
         else:
-            shell.call(self._get_run_command(script_filename), shell=True, dry=dry, wait=not self.async_run)
+            shell.call(run_cmd, shell=True, dry=dry, wait=not self.async_run)
 
     def _get_run_command(self, script_filename):
         raise NotImplementedError()
@@ -120,6 +123,8 @@ class EC2Mode(LaunchMode):
         return '\n'.join(lines)
 
     def run_script(self, script_name, dry=False, return_output=False, verbose=False):
+        if not dry:
+            raise NotImplementedError("EC2 is not implemented.")
         assert not return_output
 
         default_config = dict(
