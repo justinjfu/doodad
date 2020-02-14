@@ -11,6 +11,7 @@ query_metadata() {
     script_args=$(query_metadata script_args)
     use_gpu=$(query_metadata use_gpu)
     terminate=$(query_metadata terminate)
+    data_sync_interval=$(query_metadata data_sync_interval)
     gcp_bucket_path=$(query_metadata gcp_bucket_path)
     instance_name=$(curl http://metadata/computeMetadata/v1/instance/name -H "Metadata-Flavor: Google")
     echo "bucket_name:" $bucket_name
@@ -21,6 +22,7 @@ query_metadata() {
     echo "use_gpu:" $use_gpu
     echo "terminate:" $terminate
     echo "instance_name:" $instance_name
+    echo "data_sync_interval:" $data_sync_interval
 
     sudo apt-get update
     #install_docker
@@ -47,7 +49,7 @@ query_metadata() {
     mkdir -p /doodad
     while /bin/true; do
         gsutil -m rsync -r /doodad gs://$bucket_name/$gcp_bucket_path/logs
-        sleep 15
+        sleep $data_sync_interval
     done & echo sync from /doodad to gs://$bucket_name/$gcp_bucket_path/logs initiated
 
     # sync stdout

@@ -427,6 +427,7 @@ class GCPMode(LaunchMode):
                  gcp_label='gcp_doodad',
                  num_gpu=1,
                  gpu_model='nvidia-tesla-t4',
+                 data_sync_interval=15,
                  **kwargs):
         super(GCPMode, self).__init__(**kwargs)
         self.gcp_project = gcp_project
@@ -440,6 +441,7 @@ class GCPMode(LaunchMode):
         self.zone = zone
         self.instance_type = instance_type
         self.gcp_label = gcp_label
+        self.data_sync_interval = data_sync_interval
         self.compute = googleapiclient.discovery.build('compute', 'v1')
 
         if self.use_gpu:
@@ -483,7 +485,8 @@ class GCPMode(LaunchMode):
             'use_gpu': self.use_gpu,
             'script_args': script_args,
             'startup-script': start_script,
-            'shutdown-script': stop_script
+            'shutdown-script': stop_script,
+            'data_sync_interval': self.data_sync_interval
         }
         # instance name must match regex '(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'">
         unique_name= "doodad" + str(uuid.uuid4()).replace("-", "")
