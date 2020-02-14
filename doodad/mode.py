@@ -27,9 +27,10 @@ class LaunchMode(object):
         shell_interpreter (str): Interpreter command for script. Default 'sh'
         async_run (bool): If True, 
     """
-    def __init__(self, shell_interpreter='sh', async_run=False):
+    def __init__(self, shell_interpreter='sh', async_run=False, use_gpu=False):
         self.shell_interpreter = shell_interpreter
         self.async_run = async_run
+        self.use_gpu = use_gpu
 
     def run_script(self, script_filename, dry=False, return_output=False, verbose=False):
         """
@@ -424,6 +425,8 @@ class GCPMode(LaunchMode):
                  zone='auto',
                  instance_type='f1-micro',
                  gcp_label='gcp_doodad',
+                 num_gpu=1,
+                 gpu_model='nvidia-tesla-t4',
                  **kwargs):
         super(GCPMode, self).__init__(**kwargs)
         self.gcp_project = gcp_project
@@ -436,9 +439,13 @@ class GCPMode(LaunchMode):
         self.preemptible = preemptible
         self.zone = zone
         self.instance_type = instance_type
-        self.use_gpu = False
         self.gcp_label = gcp_label
         self.compute = googleapiclient.discovery.build('compute', 'v1')
+
+        if self.use_gpu:
+            self.num_gpu = num_gpu
+            self.gpu_model = gpu_model
+            self.gpu_type = gcp_util.get_gpu_type(self.gcp_project, self.zone, self.gpu_model)
 
     def __str__(self):
         return 'GCP-%s-%s' % (self.gcp_project, self.instance_type)
@@ -537,6 +544,11 @@ class GCPMode(LaunchMode):
                 "exp_prefix": exp_prefix,
             }
         }
+        if self.use_gpu:
+            config["guestAccelerators"] = [{
+                      "acceleratorType": self.gpu_type,
+                      "acceleratorCount": self.num_gpu,
+            }]
         compute_instances = self.compute.instances().insert(
             project=self.gcp_project,
             zone=zone,

@@ -41,12 +41,13 @@ def get_gpu_type(project, zone, gpu_model):
     Check the available gpu models for each zone
     https://cloud.google.com/compute/docs/gpus/
     """
-    assert gpu_model in [
+    assert gpu_model in {
         'nvidia-tesla-p4',
+        'nvidia-tesla-t4',
         'nvidia-tesla-k80',
         'nvidia-tesla-v100',
         'nvidia-tesla-p100'
-    ]
+    }
 
     return (
         "https://www.googleapis.com/compute/v1/"

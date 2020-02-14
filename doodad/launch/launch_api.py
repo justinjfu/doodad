@@ -44,6 +44,7 @@ def run_command(
                                                 payload_script=command,
                                                 verbose=False, 
                                                 docker_image=docker_image,
+                                                use_nvidia_docker=mode.use_gpu,
                                                 mounts=mounts)
         cmd = archive
         if cli_args:
