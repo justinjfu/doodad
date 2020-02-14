@@ -6,19 +6,18 @@ Instructions:
 3) Look inside your GCP_BUCKET under test_doodad and you should see results in secret.txt
 """
 import os
-from doodad import mount, mode
-from doodad.launch import launch_api
+import doodad
 from doodad.utils import TESTING_DIR
 from testing.config import GCP_PROJECT, GCP_BUCKET, GCP_IMAGE
 
 def run():
-    gcp_mount = mount.MountGCP(
+    gcp_mount = doodad.MountGCP(
         gcp_path='secret_output',
         mount_point='/output'
     )
     mounts = [gcp_mount]
 
-    launcher = mode.GCPMode(
+    launcher = doodad.GCPMode(
         gcp_bucket=GCP_BUCKET,
         gcp_log_path='test_doodad/gcp_gpu_test',
         gcp_project=GCP_PROJECT,
@@ -30,7 +29,7 @@ def run():
         gpu_model='nvidia-tesla-t4'
     )
 
-    launch_api.run_command(
+    doodad.run_command(
         command='nvidia-smi > /output/secret.txt',
         mode=launcher,
         mounts=mounts,

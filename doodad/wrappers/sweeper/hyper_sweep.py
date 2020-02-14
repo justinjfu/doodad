@@ -80,6 +80,7 @@ def run_sweep_doodad(target, params, run_mode, mounts, test_one=False, docker_im
                                                 payload_script=command,
                                                 verbose=verbose, 
                                                 docker_image=docker_image,
+                                                use_nvidia_docker=run_mode.use_gpu,
                                                 mounts=mounts)
 
         sweeper = Sweeper(params)
@@ -117,6 +118,7 @@ def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, do
                                                 payload_script=command,
                                                 verbose=verbose, 
                                                 docker_image=docker_image,
+                                                use_nvidia_docker=run_mode.use_gpu,
                                                 mounts=mounts)
 
         sweeper = Sweeper(params)
