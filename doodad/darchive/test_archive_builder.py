@@ -15,7 +15,6 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         mnts.append(mount.MountGit(
             git_url='https://github.com/justinjfu/doodad.git',
             branch='archive_builder_test',
-            ssh_identity='~/.ssh/github',
             mount_point='./code/doodad'
         ))
 
@@ -33,7 +32,6 @@ class TestDockerArchiveBuilder(unittest.TestCase):
         mnts.append(mount.MountGit(
             git_url='https://github.com/justinjfu/doodad.git',
             branch='archive_builder_test',
-            ssh_identity='~/.ssh/github',
             mount_point='./code/doodad',
             pythonpath=True
         ))
@@ -55,7 +53,7 @@ class TestDockerArchiveBuilder(unittest.TestCase):
             output=False
         ))
         payload_script = 'cat ./mymount/secret.txt'
-        
+
         archive = archive_builder_docker.build_archive(payload_script=payload_script,
                                                 verbose=False, 
                                                 docker_image='python:3',
