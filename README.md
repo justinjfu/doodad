@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/justinjfu/doodad/branch/master/graph/badge.svg)](https://codecov.io/gh/justinjfu/doodad)
 
 A library for packaging dependencies and launching scripts (with a focus on python) on different platforms using Docker.
-Currently supported platforms include AWS (in development), GCP, and remotely via SSH.
+Currently supported platforms include AWS, GCP, and remotely via SSH.
 
 doodad is designed to be as minimally invasive as possible - most code can be run without any modifications.
 
@@ -24,11 +24,6 @@ export PYTHONPATH=$PYTHONPATH:/path/to/this/repo
 - Install dependencies
 ```
 pip install -r requirements.txt
-```
-
-- (Optional) Set up EC2
-```
-python scripts/ec2_setup.py
 ```
 
 ## Example
