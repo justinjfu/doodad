@@ -48,9 +48,9 @@ query_metadata() {
     # we just make the archive store everything into /doodad
     mkdir -p /doodad
     while /bin/true; do
-        gsutil -m rsync -r /doodad gs://$bucket_name/$gcp_bucket_path/logs
+        gsutil -m rsync -r /doodad gs://$bucket_name/$gcp_bucket_path/outputs
         sleep $data_sync_interval
-    done & echo sync from /doodad to gs://$bucket_name/$gcp_bucket_path/logs initiated
+    done & echo sync from /doodad to gs://$bucket_name/$gcp_bucket_path/outputs initiated
 
     # sync stdout
     gcp_bucket_path=${gcp_bucket_path%/}  # remove trailing slash if present
