@@ -1,3 +1,4 @@
 GCP_BUCKET=your_bucket
 GCP_PROJECT=your_project
 GCP_IMAGE=your_image
+S3_BUCKET=your_bucket

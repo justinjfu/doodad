@@ -169,7 +169,7 @@ class MountS3(Mount):
             raise NotImplementedError('Local dir cannot be absolute')
         else:
             # We store everything into a fixed dir /doodad on the remote machine
-            # so GCPMode knows to simply sync /doodad
+            # so EC2Mode knows to simply sync /doodad
             # (this is b/c we no longer pass in mounts to the launch mode)
             self.sync_dir = os.path.join('/doodad', s3_path)
         self.output = output
@@ -184,7 +184,7 @@ class MountS3(Mount):
         return 
 
     def dar_extract_command(self):
-        return 'echo helloMountEC2'
+        return 'echo helloMountS3'
 
 
 class MountGCP(Mount):
@@ -225,3 +225,4 @@ class MountGCP(Mount):
 
     def dar_extract_command(self):
         return 'echo helloMountGCP'
+
