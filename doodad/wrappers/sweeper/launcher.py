@@ -14,6 +14,7 @@ class DoodadSweeper(object):
             docker_img='python:3',
             docker_output_dir='/data',
             local_output_dir='/data/docker',
+            s3_bucket_name=None,
             gcp_bucket_name=None,
             gcp_image=None,
             gcp_project=None,
@@ -40,6 +41,7 @@ class DoodadSweeper(object):
             self.gcp_image_project = gcp_project
         self.mount_out_gcp = mount.MountGCP(gcp_path='exp_logs', mount_point=docker_output_dir, output=True)
 
+        self.s3_bucket = s3_bucket_name
         self.mount_out_aws = mount.MountS3(s3_path='exp_logs', mount_point=docker_output_dir, output=True)
 
     def run_test_local(self, target, params, extra_mounts=None, **kwargs):
@@ -111,7 +113,7 @@ class DoodadSweeper(object):
     def run_sweep_aws(self, target, params, 
                       log_prefix=None, add_date_to_logname=True,
                       region='us-west-1', instance_type='c5.large', args=None,
-                      preemptible=True, spot_price=0.05,
+                      preemptible=True, spot_price=0.05, ami_image=None,
                       extra_mounts=None, num_chunks=-1, **kwargs):
         """
         Run a grid search on GCP
@@ -124,10 +126,12 @@ class DoodadSweeper(object):
             datestamp = datetime.now().strftime('%Y_%m_%d')
             log_prefix = '%s_%s' % (datestamp, log_prefix)
 
-        launcher = mode.EC2Autoconfig(
+        mode_ec2 = mode.EC2Autoconfig(
+            s3_bucket=self.s3_bucket,
             s3_log_path=os.path.join('doodad/logs', log_prefix),
             instance_type=instance_type,
             spot_price=spot_price,
+            ami_name=ami_image,
             region=region,
         )
 
