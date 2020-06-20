@@ -18,11 +18,11 @@ def run():
 
     launcher = mode.EC2Autoconfig(
         s3_bucket=S3_BUCKET,
-        s3_log_path='test_doodad/gcp_test',
-        instance_type='c4.large',
+        s3_log_path='test_doodad/ec2_test',
+        instance_type='t3a.micro',
         spot_price=0.03,
-        region='us-west-1',
-        ami_name='ami-874378e7',
+        region='us-east-2',
+        ami_name='ami-0aa0375ca68b5554d',
     )
 
     launch_api.run_command(
