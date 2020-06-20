@@ -126,7 +126,7 @@ class DoodadSweeper(object):
             datestamp = datetime.now().strftime('%Y_%m_%d')
             log_prefix = '%s_%s' % (datestamp, log_prefix)
 
-        mode_ec2 = mode.EC2Autoconfig(
+        mode_ec2 = doodad.mode.EC2Autoconfig(
             s3_bucket=self.s3_bucket,
             s3_log_path=os.path.join('doodad/logs', log_prefix),
             instance_type=instance_type,
