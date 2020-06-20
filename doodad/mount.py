@@ -69,7 +69,7 @@ class MountLocal(Mount):
         if mount_point is None:
             self.mount_point = self.local_dir
         else:
-            assert not self.mount_point.endswith('/'), "Do not end mount points with backslash"
+            assert not self.mount_point.endswith('/'), "Do not end mount points with backslash:"+self.mount_point
 
     def ignore_patterns(self, dirname, contents):
         to_ignore = []
