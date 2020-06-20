@@ -186,7 +186,7 @@ class EC2Mode(LaunchMode):
             script_args = ' '.join(cmd_split[1:])
         else:
             script_args = ''
-        aws_util.s3_upload(script_name, self.s3_bucket, os.path.join('doodad/mount', script_split), dry=dry)
+        aws_util.s3_upload(script_fname, self.s3_bucket, os.path.join('doodad/mount', script_split), dry=dry)
         script_s3_filename = 's3://{bucket_name}/doodad/mount/{script_name}'.format(
             bucket_name=self.s3_bucket,
             script_name=script_split
