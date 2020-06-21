@@ -119,7 +119,7 @@ class EC2Mode(LaunchMode):
         self.security_groups = security_groups
         self.security_group_ids = security_group_ids
         self.swap_size = swap_size
-        self.sync_interval = 15
+        self.sync_interval = 60
     
     def dedent(self, s):
         lines = [l.strip() for l in s.split('\n')]
@@ -207,15 +207,19 @@ class EC2Mode(LaunchMode):
         ec2_local_dir = '/doodad'
 
         # Sync interval
+        # aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
         sio.write("""
         while /bin/true; do
-            aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
+            aws s3 cp --recursive --region {region} {log_dir} {s3_path}
             sleep {periodic_sync_interval}
         done & echo sync initiated
         """.format(
-            include_string='',
-            log_dir=ec2_local_dir,
+            #include_string='',
             s3_path=s3_log_dir,
+            #periodic_sync_interval=self.sync_interval
+            log_dir=ec2_local_dir,
+            region=self.region,
+            #s3_path=stdout_log_s3_path,
             periodic_sync_interval=self.sync_interval
         ))
 
