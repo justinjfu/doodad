@@ -26,8 +26,9 @@ MAKESELF_HEADER_PATH = os.path.join(THIS_FILE_DIR, 'makeself-header.sh')
 BEGIN_HEADER = '--- BEGIN DAR OUTPUT ---'
 DAR_PAYLOAD_MOUNT = 'dar_payload'
 
-def build_archive(archive_filename='runfile.dar', 
+def build_archive(archive_filename='runfile.dar',
                   docker_image='ubuntu:18.04',
+                  singularity_image=None,
                   payload_script='',
                   mounts=(),
                   use_nvidia_docker=False,
@@ -38,10 +39,10 @@ def build_archive(archive_filename='runfile.dar',
     Args:
         archive_filename (str): Name of file to save constructed archive script
         docker_image (str): Name of docker image
-        payload_script (str): A command or sequence of shell commands to be 
+        payload_script (str): A command or sequence of shell commands to be
             executed inside the container on when the script is run.
         mounts (tuple): A list of Mount objects
-    
+
     Returns:
         str: Name of archive file.
     """
@@ -55,14 +56,22 @@ def build_archive(archive_filename='runfile.dar',
         os.makedirs(deps_dir)
         for mnt in mounts:
             mnt.dar_build_archive(deps_dir)
-        
-        write_run_script(archive_dir, mounts, 
+
+        write_run_script(archive_dir, mounts,
             payload_script=payload_script, verbose=verbose)
-        write_docker_hook(archive_dir, docker_image, mounts, verbose=verbose, use_nvidia_docker=use_nvidia_docker)
+        script_name = './final_script.sh'
+        if singularity_image:
+            write_singularity_hook(archive_dir, singularity_image, mounts,
+                                   script_name=script_name,
+                                   verbose=verbose, use_nvidia_docker=use_nvidia_docker)
+        else:
+            write_docker_hook(archive_dir, docker_image, mounts,
+                              script_name=script_name,
+                              verbose=verbose, use_nvidia_docker=use_nvidia_docker)
         write_metadata(archive_dir)
 
         # create the self-extracting archive
-        compile_archive(archive_dir, archive_filename, verbose=verbose)
+        compile_archive(archive_dir, archive_filename, script_name, verbose=verbose)
     finally:
         shutil.rmtree(work_dir)
     return archive_filename
@@ -73,14 +82,15 @@ def write_metadata(arch_dir):
         f.write('unix_timestamp=%d\n' % time.time())
         f.write('uuid=%s\n' % uuid.uuid4())
 
-def write_docker_hook(arch_dir, image_name, mounts, verbose=False, use_nvidia_docker=False):
-    docker_hook_file = os.path.join(arch_dir, 'docker.sh')
+def write_docker_hook(
+        arch_dir, image_name, mounts, script_name, verbose=False, use_nvidia_docker=False):
+    docker_hook_file = os.path.join(arch_dir, script_name)
     builder = cmd_builder.CommandBuilder()
     builder.append('#!/bin/bash')
     #if verbose:
     #    builder.echo('All script arguments:')
     #    builder.echo('$@')
-    mnt_cmd = ''.join([' -v %s:%s' % (mnt.sync_dir, mnt.mount_point) 
+    mnt_cmd = ''.join([' -v %s:%s' % (mnt.sync_dir, mnt.mount_point)
         for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/'+DAR_PAYLOAD_MOUNT
@@ -97,6 +107,30 @@ def write_docker_hook(arch_dir, image_name, mounts, verbose=False, use_nvidia_do
     with open(docker_hook_file, 'w') as f:
         f.write(builder.dump_script())
     os.chmod(docker_hook_file, 0o777)
+
+def write_singularity_hook(arch_dir, image_name, mounts,
+                           script_name,
+                           verbose=False, use_nvidia_docker=False):
+    singularity_hook_file = os.path.join(arch_dir, script_name)
+    builder = cmd_builder.CommandBuilder()
+    builder.append('#!/bin/bash')
+    mnt_cmd = ' '.join(['--bind %s:%s' % (mnt.sync_dir, mnt.mount_point)
+                       for mnt in mounts if mnt.writeable])
+    # mount the script into the docker image
+    mnt_cmd += ' --bind $(pwd):/'+DAR_PAYLOAD_MOUNT
+    singularity_cmd = ('singularity exec {gpu_opt} {mount_cmds} {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
+        gpu_opt='--nv' if use_nvidia_docker else '',
+        img=image_name,
+        mount_cmds=mnt_cmd,
+        dar_payload=DAR_PAYLOAD_MOUNT
+    ))
+    if verbose:
+        builder.echo('Singularity command:' + singularity_cmd)
+    builder.append(singularity_cmd)
+
+    with open(singularity_hook_file, 'w') as f:
+        f.write(builder.dump_script())
+    os.chmod(singularity_hook_file, 0o777)
 
 def write_run_script(arch_dir, mounts, payload_script, verbose=False):
     runfile = os.path.join(arch_dir, 'run.sh')
@@ -123,7 +157,7 @@ def write_run_script(arch_dir, mounts, payload_script, verbose=False):
 
     os.chmod(runfile, 0o777)
 
-def compile_archive(archive_dir, output_file, verbose=False):
+def compile_archive(archive_dir, output_file, script_name, verbose=False):
     compile_cmd = "{mkspath} --nocrc --nomd5 --header {mkhpath} {archive_dir} {output_file} {name} {run_script}"
     compile_cmd = compile_cmd.format(
         mkspath=MAKESELF_PATH,
@@ -131,7 +165,7 @@ def compile_archive(archive_dir, output_file, verbose=False):
         name='DAR',
         archive_dir=archive_dir,
         output_file=output_file,
-        run_script='./docker.sh'
+        run_script=script_name,
     )
     pipe = subprocess.PIPE
     p = subprocess.Popen(compile_cmd, shell=True, stdout=pipe, stderr=pipe)
@@ -153,7 +187,7 @@ def run_archive(filename, cli_args='', encoding='utf-8', shell_interpreter='sh',
 
 
 def _strip_stdout(output):
-    begin_output = output.find(BEGIN_HEADER, 0) 
+    begin_output = output.find(BEGIN_HEADER, 0)
     if begin_output >= 0:
         begin_output += len(BEGIN_HEADER)
     output = output[begin_output+1:]
