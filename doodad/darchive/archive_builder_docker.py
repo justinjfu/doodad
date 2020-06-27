@@ -25,6 +25,7 @@ MAKESELF_PATH = os.path.join(THIS_FILE_DIR, 'makeself.sh')
 MAKESELF_HEADER_PATH = os.path.join(THIS_FILE_DIR, 'makeself-header.sh')
 BEGIN_HEADER = '--- BEGIN DAR OUTPUT ---'
 DAR_PAYLOAD_MOUNT = 'dar_payload'
+FINAL_SCRIPT = './final_script.sh'
 
 def build_archive(archive_filename='runfile.dar',
                   docker_image='ubuntu:18.04',
@@ -59,19 +60,21 @@ def build_archive(archive_filename='runfile.dar',
 
         write_run_script(archive_dir, mounts,
             payload_script=payload_script, verbose=verbose)
-        script_name = './final_script.sh'
         if singularity_image:
             write_singularity_hook(archive_dir, singularity_image, mounts,
-                                   script_name=script_name,
-                                   verbose=verbose, use_nvidia_docker=use_nvidia_docker)
+                                   script_name=FINAL_SCRIPT,
+                                   verbose=verbose,
+                                   use_nvidia_docker=use_nvidia_docker)
         else:
             write_docker_hook(archive_dir, docker_image, mounts,
-                              script_name=script_name,
-                              verbose=verbose, use_nvidia_docker=use_nvidia_docker)
+                              script_name=FINAL_SCRIPT,
+                              verbose=verbose,
+                              use_nvidia_docker=use_nvidia_docker)
         write_metadata(archive_dir)
 
         # create the self-extracting archive
-        compile_archive(archive_dir, archive_filename, script_name, verbose=verbose)
+        compile_archive(archive_dir, archive_filename, FINAL_SCRIPT,
+                        verbose=verbose)
     finally:
         shutil.rmtree(work_dir)
     return archive_filename
