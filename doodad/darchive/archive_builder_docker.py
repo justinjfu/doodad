@@ -213,4 +213,3 @@ def temp_archive_file():
         yield archive_file
     finally:
         shutil.rmtree(work_dir)
-
