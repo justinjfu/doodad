@@ -30,9 +30,10 @@ FINAL_SCRIPT = './final_script.sh'
 def build_archive(archive_filename='runfile.dar',
                   docker_image='ubuntu:18.04',
                   singularity_image=None,
+                  container_type='docker',
                   payload_script='',
                   mounts=(),
-                  use_nvidia_docker=False,
+                  use_gpu_image=False,
                   verbose=False):
     """
     Construct a Doodad Archive
@@ -47,6 +48,12 @@ def build_archive(archive_filename='runfile.dar',
     Returns:
         str: Name of archive file.
     """
+    if container_type not in {'singularity', 'docker'}:
+        raise ValueError("Unknown container type: {}. Valid container types: "
+                         "'singularity', 'docker'")
+    if container_type == 'singularity' and singularity_image is None:
+        raise ValueError("singularity_image must be set.")
+
     # create a temporary work directory
     try:
         work_dir = tempfile.mkdtemp()
@@ -60,16 +67,18 @@ def build_archive(archive_filename='runfile.dar',
 
         write_run_script(archive_dir, mounts,
             payload_script=payload_script, verbose=verbose)
-        if singularity_image:
+        if container_type == 'singularity':
             write_singularity_hook(archive_dir, singularity_image, mounts,
                                    script_name=FINAL_SCRIPT,
                                    verbose=verbose,
-                                   use_nvidia_docker=use_nvidia_docker)
-        else:
+                                   use_nvidia_docker=use_gpu_image)
+        elif container_type == 'docker':
             write_docker_hook(archive_dir, docker_image, mounts,
                               script_name=FINAL_SCRIPT,
                               verbose=verbose,
-                              use_nvidia_docker=use_nvidia_docker)
+                              use_nvidia_docker=use_gpu_image)
+        else:
+            raise NotImplementedError()
         write_metadata(archive_dir)
 
         # create the self-extracting archive

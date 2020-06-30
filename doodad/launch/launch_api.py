@@ -24,6 +24,7 @@ def run_command(
         verbose=False,
         docker_image='ubuntu:18.04',
         singularity_image=None,
+        container_type='docker',
     ):
     """
     Runs a shell command using doodad via a specified launch mode.
@@ -46,7 +47,8 @@ def run_command(
                                                 verbose=False,
                                                 docker_image=docker_image,
                                                 singularity_image=singularity_image,
-                                                use_nvidia_docker=mode.use_gpu,
+                                                container_type=container_type,
+                                                use_gpu_image=mode.use_gpu,
                                                 mounts=mounts)
         cmd = archive
         if cli_args:
