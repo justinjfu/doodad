@@ -22,7 +22,9 @@ def run_command(
         mounts=tuple(),
         return_output=False,
         verbose=False,
-        docker_image='ubuntu:18.04'
+        docker_image='ubuntu:18.04',
+        singularity_image=None,
+        container_type='docker',
     ):
     """
     Runs a shell command using doodad via a specified launch mode.
@@ -34,7 +36,7 @@ def run_command(
         mounts (tuple): A list/tuple of Mount objects
         return_output (bool): If True, returns stdout as a string.
             Do not use if the output will be large.
-    
+
     Returns:
         A string output if return_output is True,
         else None
@@ -42,9 +44,11 @@ def run_command(
     with archive_builder.temp_archive_file() as archive_file:
         archive = archive_builder.build_archive(archive_filename=archive_file,
                                                 payload_script=command,
-                                                verbose=False, 
+                                                verbose=False,
                                                 docker_image=docker_image,
-                                                use_nvidia_docker=mode.use_gpu,
+                                                singularity_image=singularity_image,
+                                                container_type=container_type,
+                                                use_gpu_image=mode.use_gpu,
                                                 mounts=mounts)
         cmd = archive
         if cli_args:

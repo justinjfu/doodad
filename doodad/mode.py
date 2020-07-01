@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import uuid
@@ -5,10 +6,11 @@ import six
 import base64
 import pprint
 import shlex
+import shutil
+import pathlib
 
-from doodad.utils import shell
-from doodad.utils import safe_import
-from doodad import mount
+from doodad.apis.slurm_util import SlurmJobGenerator
+from doodad.utils import safe_import, shell, script_builder, cmd_builder
 from doodad.apis.ec2.autoconfig import Autoconfig
 from doodad.credentials.ec2 import AWSCredentials
 
@@ -25,7 +27,7 @@ class LaunchMode(object):
 
     Args:
         shell_interpreter (str): Interpreter command for script. Default 'sh'
-        async_run (bool): If True, 
+        async_run (bool): If True,
     """
     def __init__(self, shell_interpreter='sh', async_run=False, use_gpu=False):
         self.shell_interpreter = shell_interpreter
@@ -79,12 +81,12 @@ class SSHMode(LaunchMode):
         self.ssh_cred = ssh_credentials
 
     def _get_run_command(self, script_filename):
-        return self.ssh_cred.get_ssh_script_cmd(script_filename, 
+        return self.ssh_cred.get_ssh_script_cmd(script_filename,
                                                 shell_interpreter=self.shell_interpreter)
 
 
 class EC2Mode(LaunchMode):
-    def __init__(self, 
+    def __init__(self,
                  ec2_credentials,
                  s3_bucket,
                  s3_log_path,
@@ -120,7 +122,7 @@ class EC2Mode(LaunchMode):
         self.security_group_ids = security_group_ids
         self.swap_size = swap_size
         self.sync_interval = 60
-    
+
     def dedent(self, s):
         lines = [l.strip() for l in s.split('\n')]
         return '\n'.join(lines)
@@ -196,7 +198,7 @@ class EC2Mode(LaunchMode):
             script_s3_filename=script_s3_filename
         ))
 
-        # 2) Sync data 
+        # 2) Sync data
         # In theory the ec2_local_dir could be some random directory,
         # but we make it the same as the mount directory for
         # convenience.
@@ -409,7 +411,7 @@ class GCPMode(LaunchMode):
         gpu_model (str): GCP GPU model. See https://cloud.google.com/compute/docs/gpus.
         data_sync_interval (int): Number of seconds before each sync on mounts.
     """
-    def __init__(self, 
+    def __init__(self,
                  gcp_project,
                  gcp_bucket,
                  gcp_log_path,
@@ -555,3 +557,181 @@ class GCPMode(LaunchMode):
         )
         if not dry:
             return compute_instances.execute()
+
+
+class SlurmScriptMode(LaunchMode):
+    """
+    The "run_script" method in those mode will generate two scripts:
+
+    1. LOCAL_PATH/(generated-script-name)
+    2. LOCAL_PATH/script.sh
+
+    where `script.sh` with contain something like:
+
+    ```
+    sbatch --SBATCH_ARGS --wrap=$'SLURM_PATH/(generated-script-name).
+    ```
+
+    You can then easily copy `LOCAL_PATH` to a server and run `script.sh`.
+    For example, you may run the following commands from the server:
+
+    ```
+    $ scp user@my-machine:LOCAL_PATH SLURM_PATH
+    $ cd SLURM_PATH
+    $ ./script.sh
+    ```
+    """
+    def __init__(self,
+                 local_directory_for_scripts,
+                 account_name,
+                 partition,
+                 time_in_mins,
+                 max_num_cores_per_node,
+                 n_gpus=0,
+                 n_cpus_per_task=1,
+                 n_nodes=None,
+                 n_tasks=1,
+                 extra_flags="",
+                 slurm_directory_for_job_script=None,
+                 slurm_script_filename='script.sh',
+                 **kwargs):
+        super(SlurmScriptMode, self).__init__(**kwargs)
+        self.slurm_job_generator = SlurmJobGenerator(
+            account_name=account_name,
+            partition=partition,
+            time_in_mins=time_in_mins,
+            max_num_cores_per_node=max_num_cores_per_node,
+            n_gpus=n_gpus,
+            n_cpus_per_task=n_cpus_per_task,
+            n_nodes=n_nodes,
+            n_tasks=n_tasks,
+            extra_flags=extra_flags,
+        )
+        if slurm_directory_for_job_script is None:
+            slurm_directory_for_job_script = local_directory_for_scripts
+        self.local_directory_for_scripts = local_directory_for_scripts
+        self.slurm_directory_for_job_script = slurm_directory_for_job_script
+        self.slurm_script_file_path = os.path.join(
+            local_directory_for_scripts,
+            slurm_script_filename,
+        )
+
+    def __str__(self):
+        return 'Slurm-Script-%s' % self.local_directory_for_scripts
+
+    def run_script(self, script, dry=False, return_output=False, verbose=False):
+        self.save_job_script(script)
+        self.create_slurm_script(script)
+        return 'Launch script save to: {}'.format(self.slurm_script_file_path)
+
+    def save_job_script(self, script):
+        shutil.copy(script, self.local_directory_for_scripts)
+
+    def create_slurm_script(self, script):
+        new_script_path = (
+                pathlib.Path(self.slurm_directory_for_job_script)
+                / pathlib.Path(script).name
+        )
+        cmd = str(new_script_path)
+        full_cmd = self.slurm_job_generator.wrap_command_with_sbatch(cmd)
+        with open(self.slurm_script_file_path, 'w') as f:
+            f.write(full_cmd)
+
+        os.chmod(self.slurm_script_file_path, 0o777)
+        return full_cmd
+
+
+class BrcHighThroughputMode(SlurmScriptMode):
+    """
+    The "run_script" method in those mode will generate two scripts:
+
+    1. LOCAL_PATH/(generated-script-name)
+    2. LOCAL_PATH/script.sh
+    3. LOCAL_PATH/task.sh
+
+    where `script.sh` with contain something like:
+
+    ```
+    sbatch --OTHER_SBATCH_ARGS --wrap=$'module load gcc openmpi;ht_helper.sh -m "python/3.5" -t SLURM_PATH/task.sh'
+
+    ```
+
+    You can then easily copy `LOCAL_PATH` to a server and run `script.sh`.
+    For example, you may run the following commands from the server:
+
+    ```
+    $ scp user@my-machine:LOCAL_PATH SLURM_PATH
+    $ cd SLURM_PATH
+    $ ./script.sh
+    ```
+
+    This mode is specialized to Berkeley Research Computer cluster's High
+    Throughput Mode. The main difference between this mode and the base
+    `SlurmScriptMode` is that all the job inside `task.sh` will run in parallel
+    in the same node.
+
+    For more details, see
+
+    https://docs-research-it.berkeley.edu/services/high-performance-computing/user-guide/running-your-jobs/hthelper-script
+    """
+    def __init__(self,
+                 *args,
+                 task_filename='task.sh',
+                 overwrite_task_script=False,
+                 verbose_task_script_update=True,
+                 **kwargs):
+        super(BrcHighThroughputMode, self).__init__(*args, **kwargs)
+        self.local_task_file_path = os.path.join(
+            self.local_directory_for_scripts,
+            task_filename,
+        )
+        self.slurm_task_file_path = os.path.join(
+            self.slurm_directory_for_job_script,
+            task_filename,
+        )
+        self.overwrite_task_script = overwrite_task_script
+        self.verbose_task_script_update = verbose_task_script_update
+
+    def run_script(self, script, dry=False, return_output=False, verbose=False):
+        self.save_job_script(script)
+        self.create_task_file(script)
+        self.create_slurm_script(script)
+        return 'Launch script save to: {}'.format(self.slurm_script_file_path)
+
+    def create_task_file(self, script):
+        new_script_path = str(
+                pathlib.Path(self.slurm_directory_for_job_script)
+                / pathlib.Path(script).name
+        )
+        script_builder.add_to_script(
+            new_script_path,
+            path=self.local_task_file_path,
+            verbose=self.verbose_task_script_update,
+            overwrite=self.overwrite_task_script,
+        )
+
+    def create_slurm_script(self, script):
+        new_script_path = (
+                pathlib.Path(self.slurm_directory_for_job_script)
+                / pathlib.Path(script).name
+        )
+        cmd = str(new_script_path)
+        full_cmd = self.slurm_job_generator.wrap_command_with_sbatch(cmd)
+        with open(self.slurm_script_file_path, 'w') as f:
+            f.write(full_cmd)
+
+        os.chmod(self.slurm_script_file_path, 0o777)
+        cmd_list = cmd_builder.CommandBuilder()
+        cmd_list.append('module load gcc openmpi')
+        cmd_list.append('ht_helper.sh -m "python/3.5" -t {}'.format(
+            self.slurm_task_file_path
+        ))
+        full_cmd = self.slurm_job_generator.wrap_command_with_sbatch(
+            cmd_list.to_string()
+        )
+
+        with open(self.slurm_script_file_path, 'w') as f:
+            f.write(full_cmd)
+
+        os.chmod(self.slurm_script_file_path, 0o777)
+        return full_cmd
