@@ -12,7 +12,7 @@ doodad is designed to be as minimally invasive as possible - most code can be ru
 See the [quickstart](https://github.com/justinjfu/doodad/wiki/Quickstart) guide for a quick tutorial.
 
 ## Setup
-- Install Python 2.7+ or Python 3.6+. doodad currently supports both.
+- Install Python 3.6+
 
 - Install [Docker CE](https://docs.docker.com/engine/installation/).
 
