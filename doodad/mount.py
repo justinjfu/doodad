@@ -13,7 +13,7 @@ import tempfile
 from contextlib import contextmanager
 
 from doodad.apis import aws_util
-from doodad import utils 
+from doodad import utils
 
 
 class Mount(object):
@@ -63,13 +63,13 @@ class MountLocal(Mount):
         self.cleanup = cleanup
         self.filter_ext = filter_ext
         self.filter_dir = filter_dir
-        if self.writeable:
-            if not self.mount_point.startswith('/'):
-                raise ValueError('Output mount points must be absolute')
         if mount_point is None:
             self.mount_point = self.local_dir
         else:
             assert not self.mount_point.endswith('/'), "Do not end mount points with backslash:"+self.mount_point
+        if self.writeable:
+            if not self.mount_point.startswith('/'):
+                raise ValueError('Output mount points must be absolute')
 
     def ignore_patterns(self, dirname, contents):
         to_ignore = []
@@ -128,7 +128,7 @@ class MountGit(Mount):
     def dar_build_archive(self, deps_dir):
         dep_dir = os.path.join(deps_dir, 'git', self.name)
         os.makedirs(dep_dir)
-        
+
         extract_file = os.path.join(dep_dir, 'extract.sh')
         with open(extract_file, 'w') as f:
             mount_point = os.path.dirname(self.mount_point)
@@ -156,12 +156,12 @@ class MountGit(Mount):
 
 
 class MountS3(Mount):
-    def __init__(self, 
-                s3_path, 
-                sync_interval=15, 
+    def __init__(self,
+                s3_path,
+                sync_interval=15,
                 output=True,
                 dry=False,
-                include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'), 
+                include_types=('*.txt', '*.csv', '*.json', '*.gz', '*.tar', '*.log', '*.pkl'),
                 **kwargs):
         super(MountS3, self).__init__(output=output, **kwargs)
         # load from config
@@ -181,16 +181,16 @@ class MountS3(Mount):
         assert output
 
     def dar_build_archive(self, deps_dir):
-        return 
+        return
 
     def dar_extract_command(self):
         return 'echo helloMountS3'
 
 
 class MountGCP(Mount):
-    def __init__(self, 
+    def __init__(self,
                 gcp_path=None,
-                sync_interval=15, 
+                sync_interval=15,
                 output=True,
                 dry=False,
                 exclude_regex='*.tmp',
@@ -221,7 +221,7 @@ class MountGCP(Mount):
         assert output
 
     def dar_build_archive(self, deps_dir):
-        return 
+        return
 
     def dar_extract_command(self):
         return 'echo helloMountGCP'
