@@ -8,6 +8,7 @@ Currently, doodad uses makeself as a backend to build these
 packaged scripts.
 """
 import os
+import pathlib
 import sys
 import tempfile
 import shutil
@@ -128,9 +129,15 @@ def write_singularity_hook(arch_dir, image_name, mounts,
     builder.append('#!/bin/bash')
     mnt_cmd = ' '.join(['--bind %s:%s' % (mnt.sync_dir, mnt.mount_point)
                        for mnt in mounts if mnt.writeable])
-    # mount the script into the docker image
+    tmp_dir = tempfile.mkdtemp()
+    def create_bind_flag(mnt):
+        parent_directory = pathlib.Path(mnt.mount_point).parent
+        return '--bind %s:%s' % (tmp_dir, parent_directory)
+    mnt_cmd += ' ' + ' '.join([create_bind_flag(mnt)
+                        for mnt in mounts if not mnt.writeable][:-1])
     mnt_cmd += ' --bind $(pwd):/'+DAR_PAYLOAD_MOUNT
-    singularity_cmd = ('singularity exec {gpu_opt} {mount_cmds} {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
+    singularity_cmd = ('mkdir {tmp_dir}; singularity exec {gpu_opt} {mount_cmds} {img} /bin/bash -c "cd /{dar_payload}; ./run.sh $*"'.format(
+        tmp_dir=tmp_dir,
         gpu_opt='--nv' if use_nvidia_docker else '',
         img=image_name,
         mount_cmds=mnt_cmd,
