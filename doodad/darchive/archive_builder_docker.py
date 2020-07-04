@@ -134,7 +134,7 @@ def write_singularity_hook(arch_dir, image_name, mounts,
         parent_directory = pathlib.Path(mnt.mount_point).parent
         return '--bind %s:%s' % (tmp_dir, parent_directory)
     mnt_cmd += ' ' + ' '.join([create_bind_flag(mnt)
-                        for mnt in mounts if not mnt.writeable][:-1])
+                               for mnt in mounts if not mnt.writeable])
     mnt_cmd += ' --bind $(pwd):/'+DAR_PAYLOAD_MOUNT
     singularity_cmd = ('mkdir {tmp_dir}; singularity exec {gpu_opt} {mount_cmds} {img} /bin/bash -c "cd /{dar_payload}; ./run.sh $*"'.format(
         tmp_dir=tmp_dir,
