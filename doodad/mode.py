@@ -569,7 +569,7 @@ class SlurmScriptMode(LaunchMode):
     where `script.sh` with contain something like:
 
     ```
-    sbatch --SBATCH_ARGS --wrap=$'SLURM_PATH/(generated-script-name).
+    sbatch --SBATCH_ARGS --wrap=$'SLURM_PATH/(generated-script) -- cli_args'
     ```
 
     You can then easily copy `LOCAL_PATH` to a server and run `script.sh`.
@@ -625,14 +625,21 @@ class SlurmScriptMode(LaunchMode):
         return 'Launch script save to: {}'.format(self.slurm_script_file_path)
 
     def save_job_script(self, script):
-        shutil.copy(script, self.local_directory_for_scripts)
+        script_without_cli_args, *cli_args = script.split(' -- ')
+        if len(cli_args) > 1:
+            raise ValueError("Pattern ' -- ' should appear at most once.")
+        shutil.copy(script_without_cli_args, self.local_directory_for_scripts)
 
     def create_slurm_script(self, script):
+        script_without_cli_args, *cli_args = script.split(' -- ')
+        if len(cli_args) > 1:
+            raise ValueError("Pattern ' -- ' should appear at most once.")
         new_script_path = (
                 pathlib.Path(self.slurm_directory_for_job_script)
-                / pathlib.Path(script).name
+                / pathlib.Path(script_without_cli_args).name
         )
-        cmd = str(new_script_path)
+        cmd_with_cli_args = [str(new_script_path)] + cli_args
+        cmd = ' -- '.join(cmd_with_cli_args)
         full_cmd = self.slurm_job_generator.wrap_command_with_sbatch(cmd)
         with open(self.slurm_script_file_path, 'w') as f:
             f.write(full_cmd)
@@ -699,39 +706,26 @@ class BrcHighThroughputMode(SlurmScriptMode):
         return 'Launch script save to: {}'.format(self.slurm_script_file_path)
 
     def create_task_file(self, script):
+        script_without_cli_args, *cli_args = script.split(' -- ')
+        if len(cli_args) > 1:
+            raise ValueError("Pattern ' -- ' should appear at most once.")
         new_script_path = str(
                 pathlib.Path(self.slurm_directory_for_job_script)
-                / pathlib.Path(script).name
+                / pathlib.Path(script_without_cli_args).name
         )
+        cmd_with_cli_args = [str(new_script_path)] + cli_args
+        cmd = ' -- '.join(cmd_with_cli_args)
         script_builder.add_to_script(
-            new_script_path,
+            cmd,
             path=self.local_task_file_path,
             verbose=self.verbose_task_script_update,
             overwrite=self.overwrite_task_script,
         )
 
     def create_slurm_script(self, script):
-        new_script_path = (
-                pathlib.Path(self.slurm_directory_for_job_script)
-                / pathlib.Path(script).name
-        )
-        cmd = str(new_script_path)
-        full_cmd = self.slurm_job_generator.wrap_command_with_sbatch(cmd)
-        with open(self.slurm_script_file_path, 'w') as f:
-            f.write(full_cmd)
-
-        os.chmod(self.slurm_script_file_path, 0o777)
         cmd_list = cmd_builder.CommandBuilder()
         cmd_list.append('module load gcc openmpi')
         cmd_list.append('ht_helper.sh -m "python/3.5" -t {}'.format(
             self.slurm_task_file_path
         ))
-        full_cmd = self.slurm_job_generator.wrap_command_with_sbatch(
-            cmd_list.to_string()
-        )
-
-        with open(self.slurm_script_file_path, 'w') as f:
-            f.write(full_cmd)
-
-        os.chmod(self.slurm_script_file_path, 0o777)
-        return full_cmd
+        super().create_slurm_script(cmd_list.to_string())
