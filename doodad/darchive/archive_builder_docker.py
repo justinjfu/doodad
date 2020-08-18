@@ -32,6 +32,7 @@ def build_archive(archive_filename='runfile.dar',
                   docker_image='ubuntu:18.04',
                   singularity_image=None,
                   container_type='docker',
+                  extra_container_flags='',
                   payload_script='',
                   mounts=(),
                   use_gpu_image=False,
@@ -70,11 +71,13 @@ def build_archive(archive_filename='runfile.dar',
             payload_script=payload_script, verbose=verbose)
         if container_type == 'singularity':
             write_singularity_hook(archive_dir, singularity_image, mounts,
+                                   extra_flags=extra_container_flags,
                                    script_name=FINAL_SCRIPT,
                                    verbose=verbose,
                                    use_nvidia_docker=use_gpu_image)
         elif container_type == 'docker':
             write_docker_hook(archive_dir, docker_image, mounts,
+                              extra_flags=extra_container_flags,
                               script_name=FINAL_SCRIPT,
                               verbose=verbose,
                               use_nvidia_docker=use_gpu_image)
@@ -96,7 +99,9 @@ def write_metadata(arch_dir):
         f.write('uuid=%s\n' % uuid.uuid4())
 
 def write_docker_hook(
-        arch_dir, image_name, mounts, script_name, verbose=False, use_nvidia_docker=False):
+        arch_dir, image_name, mounts, script_name,
+        extra_flags='',
+        verbose=False, use_nvidia_docker=False):
     docker_hook_file = os.path.join(arch_dir, script_name)
     builder = cmd_builder.CommandBuilder()
     builder.append('#!/bin/bash')
@@ -107,9 +112,10 @@ def write_docker_hook(
         for mnt in mounts if mnt.writeable])
     # mount the script into the docker image
     mnt_cmd += ' -v $(pwd):/'+DAR_PAYLOAD_MOUNT
-    docker_cmd = ('docker run {gpu_opt} {mount_cmds} -t {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
+    docker_cmd = ('docker run {gpu_opt} {mount_cmds} {extra_flags} -t {img} /bin/bash -c "cd /{dar_payload};./run.sh $*"'.format(
         gpu_opt='--gpus all' if use_nvidia_docker else '',
         img=image_name,
+        extra_flags=extra_flags,
         mount_cmds=mnt_cmd,
         dar_payload=DAR_PAYLOAD_MOUNT
     ))
@@ -123,6 +129,7 @@ def write_docker_hook(
 
 def write_singularity_hook(arch_dir, image_name, mounts,
                            script_name,
+                           extra_flags='',
                            verbose=False, use_nvidia_docker=False):
     singularity_hook_file = os.path.join(arch_dir, script_name)
     builder = cmd_builder.CommandBuilder()
@@ -136,10 +143,11 @@ def write_singularity_hook(arch_dir, image_name, mounts,
     mnt_cmd += ' ' + ' '.join([create_bind_flag(mnt)
                                for mnt in mounts if not mnt.writeable])
     mnt_cmd += ' --bind $(pwd):/'+DAR_PAYLOAD_MOUNT
-    singularity_cmd = ('mkdir {tmp_dir}; singularity exec {gpu_opt} {mount_cmds} {img} /bin/bash -c "cd /{dar_payload}; ./run.sh $*"'.format(
+    singularity_cmd = ('mkdir {tmp_dir}; singularity exec {extra_flags} {gpu_opt} {mount_cmds} {img} /bin/bash -c "cd /{dar_payload}; ./run.sh $*"'.format(
         tmp_dir=tmp_dir,
         gpu_opt='--nv' if use_nvidia_docker else '',
         img=image_name,
+        extra_flags=extra_flags,
         mount_cmds=mnt_cmd,
         dar_payload=DAR_PAYLOAD_MOUNT
     ))
