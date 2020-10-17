@@ -106,20 +106,14 @@ def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, do
     target_mount = mount.MountLocal(local_dir=target_dir, mount_point=target_mount_dir)
     mounts = list(mounts) + [target_mount]
     target_full_path = os.path.join(target_mount.mount_point, os.path.basename(target))
-    command = launch_api.make_python_command(
-        target_full_path
-    )
+    #command = launch_api.make_python_command(
+    #    target_full_path
+    #)
 
     print('Launching jobs with mode %s' % run_mode)
     results = []
     njobs = 0
     with archive_builder.temp_archive_file() as archive_file:
-        archive = archive_builder.build_archive(archive_filename=archive_file,
-                                                payload_script=command,
-                                                verbose=verbose,
-                                                docker_image=docker_image,
-                                                use_gpu_image=run_mode.use_gpu,
-                                                mounts=mounts)
 
         sweeper = Sweeper(params)
         chunks = chunker(sweeper, num_chunks, confirm=confirm)
@@ -128,10 +122,16 @@ def run_sweep_doodad_chunked(target, params, run_mode, mounts, num_chunks=10, do
             for config in chunk:
                 njobs += 1
                 cli_args=' '.join(['--%s %s' % (key, config[key]) for key in config])
-                single_command = archive + ' -- ' + cli_args
-                command += '%s;' % single_command
+                single_command = target_full_path + ' ' + cli_args
+                command += 'python %s;' % single_command
+            archive = archive_builder.build_archive(archive_filename=archive_file,
+                                                    payload_script=command,
+                                                    verbose=verbose,
+                                                    docker_image=docker_image,
+                                                    use_gpu_image=run_mode.use_gpu,
+                                                    mounts=mounts)
 
-            result = run_mode.run_script(command, return_output=return_output, verbose=False)
+            result = run_mode.run_script(archive, return_output=return_output, verbose=False)
             if return_output:
                 result = archive_builder._strip_stdout(result)
                 results.append(result)
