@@ -70,6 +70,8 @@ class MountLocal(Mount):
         if self.writeable:
             if not self.mount_point.startswith('/'):
                 raise ValueError('Output mount points must be absolute')
+            if not self.local_dir.startswith('/'):
+                raise ValueError('Output local directories must be absolute')
 
     def ignore_patterns(self, dirname, contents):
         to_ignore = []
