@@ -1,5 +1,5 @@
 """
-A simplified API for invoking commands via doodad.
+A simplified API for invoking commands via dodaad.
 
 Here is a simple hello world example using run_command:
 
